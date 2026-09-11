@@ -9,6 +9,8 @@
     "start": "bun src/server.ts",
     "build": "bun scripts/build.ts",
     "site:dev": "bun scripts/preview-site.ts",
+    "site:build": "bun scripts/build-site.ts",
+    "site:preview": "bun run site:build && bun scripts/preview-site.ts --production",
     "check": "tsc --noEmit",
     "test": "bun test tests",
     "cli": "bun src/cli.ts",

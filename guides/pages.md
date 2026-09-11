@@ -1,6 +1,6 @@
 # GitHub Pagesの紹介サイト
 
-`site/` にKituneの日本語紹介サイトを置いています。HTML・CSS・JavaScriptだけで構成し、依存のインストールやビルドは不要です。認証サーバー本体はGitHub Pagesでは実行できません。
+`site/` にKituneの日本語紹介サイトのソースを置いています。Bun 1.4.0のHTMLビルドでCSS・JavaScriptを圧縮し、公開用ファイルを `site/dist/` に生成します。追加の依存インストールは不要です。認証サーバー本体はGitHub Pagesでは実行できません。
 
 ## ローカルで確認する
 
@@ -12,14 +12,37 @@ bun run site:dev
 
 プレビューは `http://127.0.0.1:4173/Kitune/` です。GitHub Pagesのプロジェクトパスを再現し、`site/` の公開ファイルだけを配信します。HTML・CSS・JavaScriptの変更後はブラウザを再読み込みしてください。
 
+公開用のビルドと、その確認には次を使います。
+
+```sh
+bun run site:build
+bun run site:preview
+```
+
+`site:preview` は再ビルドして `http://127.0.0.1:4174/Kitune/` で生成物を配信します。編集用プレビューと同時に実行できます。
+
+## ソースと生成物
+
+次のソースとビルドスクリプトはGitに含めます。
+
 - `site/index.html`: 紹介、認証構成、導入手順、既存ガイドへのリンク。
 - `site/style.css`: デザインとモバイル対応。
 - `site/script.js`: 導入コマンドのコピー。JavaScriptが無効でも本文とリンクは利用できます。
 - `site/favicon.svg`: 🦊のロゴ。
+- `scripts/build-site.ts`: 公開用のビルド。
+
+`site/dist/` は既存の `.gitignore` の `dist/` 規則で除外され、コミットしません。ビルド時はこの生成先だけを作り直します。アプリ本体の `dist/` には影響しません。
+
+BunがCSS・JavaScript・faviconにハッシュ付きのファイル名を付け、HTMLの参照を相対パスで書き換えます。`pre` のコマンドなど、HTML内の文章や改行は維持します。CDNのフォント・ロゴは引き続きブラウザから直接読み込みます。
 
 日本語フォントはGoogle FontsのCDNからLINE Seed JP（Regular 400・Bold 700・ExtraBold 800）を読み込みます。`display=swap` を指定し、取得中やCDNに接続できない場合は端末のフォントで表示します。コードは等幅フォント、ロゴは端末の🦊絵文字です。
 
-アセットのURLは相対パスなので、リポジトリのサブパスでも配信できます。GitHubへのリンクは `glyzinie/Kitune` を参照しています。fork先で使う場合はリンクと `scripts/preview-site.ts` の `basePath` も更新してください。
+構成図のDiscord・Dexには公式ロゴを使い、色と縦横比を維持しています。名称も併記し、ロゴは装飾画像として扱います。
+
+- Discord: [公式ブランドページ](https://discord.com/branding)が使うWebflow CDNから、青紫色のClydeシンボルを直接読み込みます。
+- Dex: [公式サイトのロゴ](https://github.com/dexidp/website/blob/59a0f7028c56cccad806e8f8dd6553da4aef6d64/static/img/logos/dex-glyph-color.svg)をjsDelivr経由で読み込みます。配信元は第三者CDNですが、参照先を公式リポジトリのコミットに固定し、公式サイトと同一の素材を使っています。ロゴを含むカードはDexの公式サイトへリンクします。
+
+ローカルのCSS・JavaScript・faviconは相対パスなので、リポジトリのサブパスでも配信できます。GitHubへのリンクは `glyzinie/Kitune` を参照しています。fork先で使う場合はリンクと `scripts/preview-site.ts` の `basePath` も更新してください。
 
 ## 初回公開
 
@@ -29,6 +52,6 @@ bun run site:dev
 
 標準の公開先は <https://glyzinie.github.io/Kitune/> です。カスタムドメインの設定は含めていません。
 
-以後は `site/` またはPages workflowに変更を加えて `main` へpushすると再公開されます。workflowが公開するのは `site/` だけです。設定、秘密値、SQLiteデータ、バックアップはこのディレクトリに置かないでください。
+以後はサイトのソース、ビルドスクリプト、`package.json`、`.bun-version` またはPages workflowに変更を加えて `main` へpushすると、Actionsがビルドして再公開します。workflowが公開するのは `site/dist/` だけです。設定、秘密値、SQLiteデータ、バックアップはサイトのソースや生成先に置かないでください。
 
 コミット・push・GitHub Pagesの有効化と公開は、ローカルでのサイト作成とは別の操作です。

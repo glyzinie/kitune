@@ -1,16 +1,12 @@
 const basePath = "/Kitune/";
-const files = new Map([
-  ["", "index.html"],
-  ["index.html", "index.html"],
-  ["style.css", "style.css"],
-  ["script.js", "script.js"],
-  ["favicon.svg", "favicon.svg"],
-]);
+const production = process.argv.includes("--production");
+const directory = new URL(production ? "../site/dist/" : "../site/", import.meta.url);
+const sourceFiles = new Set(["index.html", "style.css", "script.js", "favicon.svg"]);
 
 const server = Bun.serve({
   hostname: "127.0.0.1",
-  port: 4173,
-  fetch(request) {
+  port: production ? 4174 : 4173,
+  async fetch(request) {
     const { pathname } = new URL(request.url);
     if (request.method !== "GET" && request.method !== "HEAD") {
       return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
@@ -18,9 +14,14 @@ const server = Bun.serve({
     if (pathname === "/" || pathname === basePath.slice(0, -1)) {
       return new Response(null, { status: 302, headers: { Location: basePath } });
     }
-    const filename = pathname.startsWith(basePath) ? files.get(pathname.slice(basePath.length)) : undefined;
-    if (!filename) return new Response("Not found", { status: 404 });
-    const file = Bun.file(new URL(`../site/${filename}`, import.meta.url));
+    if (!pathname.startsWith(basePath)) return new Response("Not found", { status: 404 });
+    const filename = pathname.slice(basePath.length) || "index.html";
+    const allowed = production
+      ? filename === "index.html" || /^[\w-]+\.(?:js|css|svg)$/.test(filename)
+      : sourceFiles.has(filename);
+    if (!allowed) return new Response("Not found", { status: 404 });
+    const file = Bun.file(new URL(filename, directory));
+    if (!await file.exists()) return new Response("Not found", { status: 404 });
     return new Response(request.method === "HEAD" ? null : file, {
       headers: { "Content-Type": file.type, "Cache-Control": "no-store" },
     });

@@ -86,6 +86,6 @@ GitHub ActionsはAMD64・ARM64それぞれのネイティブランナーでビ�
 
 ## 紹介サイト
 
-GitHub Pages向けの日本語サイトは `site/` にあります。`bun run site:dev` でローカルプレビューを起動できます。[編集と公開の手順](guides/pages.md)を参照してください。
+GitHub Pages向けの日本語サイトのソースは `site/` にあります。`bun run site:dev` で編集用プレビュー、`bun run site:preview` でビルド済みのサイトを確認できます。Actionsは `bun run site:build` で `site/dist/` を生成し、その内容を公開します。生成物はGitに含めません。[編集と公開の手順](guides/pages.md)を参照してください。
 
 紹介サイトとアプリの日本語フォントには、Google FontsのCDNで配信されるLINE Seed JPを使用します。取得中やCDNに接続できない場合も、端末のフォントで表示します。

@@ -8,6 +8,7 @@
     "dev": "bun run build && bun --watch src/server.ts",
     "start": "bun src/server.ts",
     "build": "bun scripts/build.ts",
+    "site:dev": "bun scripts/preview-site.ts",
     "check": "tsc --noEmit",
     "test": "bun test tests",
     "cli": "bun src/cli.ts",

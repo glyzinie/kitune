@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f5ef">
+    <title>Kitune — 自分のための、認証基盤。</title>
+    <meta name="description" content="PasskeyとDiscordでログインする、個人用のOIDC認証元。Kituneと自分のDexで、サービスや家族・サークルにつながる認証基盤をつくれます。">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="og:site_name" content="Kitune">
+    <meta property="og:title" content="Kitune — 自分のための、認証基盤。">
+    <meta property="og:description" content="PasskeyとDiscordでログイン。自分のDexを通じて、いつものサービスへ。">
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+    <link rel="stylesheet" href="./style.css">
+    <script type="module" src="./script.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">本文へ移動</a>
+    <header class="site-header wrap">
+      <a class="brand" href="./" aria-label="Kitune ホーム"><span class="brand-mark" aria-hidden="true">🦊</span>Kitune<span class="brand-reading">きつね</span></a>
+      <nav aria-label="メインナビゲーション">
+        <a href="#features">特徴</a>
+        <a href="#start">はじめる</a>
+        <a href="#docs">ドキュメント</a>
+        <a class="github-link" href="https://github.com/glyzinie/Kitune">GitHub <span aria-hidden="true">↗</span></a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero wrap" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>YOUR PERSONAL IDENTITY</p>
+          <h1 id="hero-title">自分の認証を、<br><span>自分の手に。</span></h1>
+          <p class="hero-description">PasskeyとDiscordでログインする、<br class="desktop-break">個人用のOIDC認証元。<br>自分のDexを通じて、いつものサービスへ。</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#start">Kituneをはじめる <span aria-hidden="true">↗</span></a>
+            <a class="source-link" href="https://github.com/glyzinie/Kitune">ソースコードを見る <span aria-hidden="true">↗</span></a>
+          </div>
+          <p class="hero-note">あなたのアカウントを、あなたの手で。</p>
+        </div>
+
+        <figure class="identity-map" aria-labelledby="map-title">
+          <figcaption class="map-caption" id="map-title"><span>小さく持って、つながる。</span><span class="mono">01 / IDENTITY</span></figcaption>
+          <div class="identity-card">
+            <div class="identity-heading"><span class="brand-mark" aria-hidden="true">🦊</span><div><strong>Kitune</strong><span>あなたの認証元</span></div><span class="owned-label">SELF-HOSTED</span></div>
+            <div class="login-methods">
+              <div class="login-method"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="9" r="4"></circle><path d="m11 12 8 8m-4-4 3-3m-1 5 3-3"></path></svg><strong>Passkey</strong><span>端末で本人確認</span></div>
+              <div class="login-method"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6l-5 3v-3H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"></path><circle cx="8" cy="11" r="1" fill="currentColor" stroke="none"></circle><circle cx="16" cy="11" r="1" fill="currentColor" stroke="none"></circle></svg><strong>Discord</strong><span>設定したIDで連携</span></div>
+            </div>
+            <div class="identity-bottom"><span>ひとつのユーザーID</span><code>sub: owner</code></div>
+          </div>
+          <div class="connection"><span>OpenID Connect</span></div>
+          <div class="broker"><span class="broker-icon" aria-hidden="true">D</span><div><strong>あなたのDex</strong><span>サービスへの接続をまとめる</span></div><span class="broker-protocol">OIDC</span></div>
+          <div class="destinations"><span>個人サービス</span><span>家族Dex</span><span>サークルDex</span></div>
+          <p class="map-note">認証は手元に。つながりは、その先へ。</p>
+        </figure>
+      </section>
+
+      <div class="stack-strip wrap" aria-label="利用技術">
+        <span class="stack-label">A SMALL, FAMILIAR STACK</span>
+        <ul role="list"><li>Bun</li><li>Hono</li><li>Better Auth</li><li>SQLite</li></ul>
+        <span class="stack-caption">シンプルな構成で動く。</span>
+      </div>
+
+      <section class="features wrap section-space" id="features" aria-labelledby="features-title">
+        <div class="section-heading"><p class="eyebrow">MADE FOR YOUR OWN IDENTITY</p><h2 id="features-title">自分で持つ。<br class="mobile-break">無理なく、使い続ける。</h2></div>
+        <div class="feature-grid">
+          <article class="feature">
+            <div class="feature-top"><span class="feature-number">01</span><span class="feature-category">SIGN IN</span></div>
+            <h3>いつもの端末が、鍵になる。</h3>
+            <p>指紋・顔認証やPINを使うPasskeyでログイン。Discordも、事前に設定したアカウントで使えます。</p>
+            <span class="feature-footnote">Passkey + Discord</span>
+          </article>
+          <article class="feature">
+            <div class="feature-top"><span class="feature-number">02</span><span class="feature-category">CONFIGURE</span></div>
+            <h3>管理の起点は、設定ファイル。</h3>
+            <p>ユーザー、Discordの紐付け、OIDCクライアントをTOMLで管理。変更は設定を更新し、再起動して反映します。</p>
+            <span class="feature-footnote">Configuration as the source of truth</span>
+          </article>
+          <article class="feature">
+            <div class="feature-top"><span class="feature-number">03</span><span class="feature-category">CONNECT</span></div>
+            <h3>自分のDexから、広がる。</h3>
+            <p>サービスとの接続は個人Dexに集約。家族やサークルのDexともつなぎ、各サービスで権限を管理します。</p>
+            <a class="feature-footnote text-link" href="https://github.com/glyzinie/Kitune/blob/main/guides/federation.md">認証の構成を見る <span aria-hidden="true">↗</span></a>
+          </article>
+        </div>
+        <div class="protocol-note"><span class="protocol-label">BUILT ON OIDC</span><p>認可コード + S256 PKCE、ローテーション付きrefresh tokenに対応。接続先は、クライアントsecretを保持できる認証ブローカーです。正式な検証対象はDexです。</p></div>
+      </section>
+
+      <section class="start-section" id="start" aria-labelledby="start-title">
+        <div class="start-layout wrap">
+          <div class="start-intro"><p class="eyebrow">GET STARTED</p><h2 id="start-title">まずは、<br>自分の端末から。</h2><p>Bun 1.4.0を用意して、<br>ローカルでKituneを動かしてみましょう。</p><a class="start-guide" href="https://github.com/glyzinie/Kitune#はじめる">READMEで手順を読む <span aria-hidden="true">↗</span></a><div class="local-note"><span class="mono">LOCAL DEVELOPMENT</span><code>http://localhost:3000</code><p>Passkeyを使うため、ホスト名は<br><code>localhost</code>を指定します。</p></div></div>
+          <ol class="setup-steps" role="list">
+            <li>
+              <div class="step-heading"><span class="step-number">1</span><h3>取得して、設定を用意する</h3></div>
+              <div class="code-block"><div class="code-toolbar"><span>TERMINAL</span><button type="button" class="copy-button" data-copy="setup-code" aria-label="取得と設定準備のコマンドをコピー" hidden>コピー <span aria-hidden="true">⧉</span></button></div><pre tabindex="0" aria-label="取得と設定準備のコマンド"><code id="setup-code">git clone https://github.com/glyzinie/Kitune.git
+cd Kitune
+cp config.example.toml config.toml
+cp .env.example .env
+bun install --frozen-lockfile</code></pre></div>
+            </li>
+            <li>
+              <div class="step-heading"><span class="step-number">2</span><h3>自分の設定で、起動する</h3></div>
+              <p class="step-description"><code>config.toml</code>のユーザー・クライアントを編集し、<code>.env</code>に<code>BETTER_AUTH_SECRET</code>と<code>PERSONAL_DEX_CLIENT_SECRET</code>を設定します。各秘密値は<code>openssl rand -hex 32</code>などで個別に生成してください。</p>
+              <div class="code-block"><div class="code-toolbar"><span>TERMINAL</span><button type="button" class="copy-button" data-copy="start-code" aria-label="起動コマンドをコピー" hidden>コピー <span aria-hidden="true">⧉</span></button></div><pre tabindex="0" aria-label="起動コマンド"><code id="start-code">bun run cli check-config
+bun run dev</code></pre></div>
+            </li>
+            <li>
+              <div class="step-heading"><span class="step-number">3</span><h3>最初のPasskeyを登録する</h3></div>
+              <p class="step-description">別のターミナルで実行し、表示されたURLをブラウザで開きます。<code>owner</code>は設定したユーザーIDに置き換えてください。登録URLは15分間、一度だけ有効です。</p>
+              <div class="code-block"><div class="code-toolbar"><span>ANOTHER TERMINAL</span><button type="button" class="copy-button" data-copy="enroll-code" aria-label="Passkey登録コマンドをコピー" hidden>コピー <span aria-hidden="true">⧉</span></button></div><pre tabindex="0" aria-label="Passkey登録コマンド"><code id="enroll-code">bun run cli enroll owner</code></pre></div>
+            </li>
+          </ol>
+        </div>
+        <p class="copy-status wrap" id="copy-status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="docs-section wrap section-space" id="docs" aria-labelledby="docs-title">
+        <div class="docs-intro"><p class="eyebrow">A LITTLE FURTHER</p><h2 id="docs-title">次の一歩も、<br>迷わずに。</h2><p>自分の環境で動かすところから、<br>Dexとの接続、日々の運用まで。</p></div>
+        <div class="resource-list">
+          <a class="resource" href="https://github.com/glyzinie/Kitune/blob/main/guides/deployment.md"><span class="resource-index">01</span><div><h3>KituneとDexを配置する</h3><p>ドメイン、Flyの構成、起動までの手順。</p></div><span class="resource-arrow" aria-hidden="true">↗</span></a>
+          <a class="resource" href="https://github.com/glyzinie/Kitune/blob/main/guides/federation.md"><span class="resource-index">02</span><div><h3>認証のつながりを設計する</h3><p>個人・家族・サークルのDexと役割分担。</p></div><span class="resource-arrow" aria-hidden="true">↗</span></a>
+          <a class="resource" href="https://github.com/glyzinie/Kitune/blob/main/guides/operations.md"><span class="resource-index">03</span><div><h3>日々の管理とバックアップ</h3><p>設定変更、秘密値、失効、復元の手順。</p></div><span class="resource-arrow" aria-hidden="true">↗</span></a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer wrap"><div><a class="brand" href="./"><span class="brand-mark" aria-hidden="true">🦊</span>Kitune</a><p>自分のための、認証基盤。</p></div><div class="footer-links"><a href="https://github.com/glyzinie/Kitune">GitHub <span aria-hidden="true">↗</span></a><a href="https://github.com/glyzinie/Kitune/blob/main/README.md">README <span aria-hidden="true">↗</span></a></div><span class="footer-signoff">OWN YOUR IDENTITY.</span></footer>
+  </body>
+</html>

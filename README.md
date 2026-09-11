@@ -83,3 +83,7 @@ GitHub ActionsはAMD64・ARM64それぞれのネイティブランナーでビ�
 公開処理にはリポジトリの `GITHUB_TOKEN` を使い、Flyの秘密値は不要です。初回発行後、GitHub Packagesのパッケージ設定でVisibilityがPublicになっていることを確認してください。Flyへのデプロイはこのworkflowから実行しません。
 
 コンテナには `BETTER_AUTH_SECRET` とクライアント秘密値を環境変数で渡し、設定を `/app/config.toml`、永続Volumeを `/data` に配置します。実ユーザー設定・秘密値・DB・バックアップはイメージに含めません。
+
+## 紹介サイト
+
+GitHub Pages向けの日本語サイトは `site/` にあります。`bun run site:dev` でローカルプレビューを起動できます。[編集と公開の手順](guides/pages.md)を参照してください。

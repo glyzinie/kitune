@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { isIP } from "node:net";
 import { z } from "zod";
+import { themeNames } from "./theme";
 
 export const scopes = ["openid", "profile", "email", "groups", "offline_access"] as const;
 const identifier = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/);
@@ -48,6 +49,7 @@ const clientSchema = z.strictObject({
 export const configSchema = z.strictObject({
   origin,
   name: z.string().trim().min(1).max(100).default("Kitune"),
+  theme: z.enum(themeNames).optional(),
   theme_color: z.string().regex(/^#[0-9a-f]{6}$/i, "Use a six-digit hex color, for example #2563eb").optional(),
   users: z.array(userSchema).min(1),
   clients: z.array(clientSchema).default([]),

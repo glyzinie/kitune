@@ -1,7 +1,10 @@
 origin = "http://localhost:3000"
 # 本番の例: origin = "https://id.example.com"
 name = "Kitune"
-# 任意のテーマカラー（#RRGGBB）。省略時は既定の配色を使います。
+# 配色のプリセット: lavender / blue / sage / amber。未指定時は amber。
+theme = "amber"
+# 任意の色（#RRGGBB）を使う場合は theme を削除し、以下を指定します。
+# 両方指定した場合は theme を優先します。
 # theme_color = "#2563eb"
 
 [[users]]

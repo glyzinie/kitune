@@ -25,7 +25,7 @@ function Shell({ name, title, children, wide = false }: { name: string; title: s
 export function createApp(runtime: Runtime) {
   const { auth, store, settings } = runtime;
   const { config } = settings;
-  const themeCss = themeStyles(config.theme_color);
+  const themeCss = themeStyles(config);
   const app = new Hono();
   app.use("*", bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({ message: "リクエストが大きすぎます。" }, 413) }));
   app.use("*", secureHeaders({
@@ -54,7 +54,7 @@ export function createApp(runtime: Runtime) {
     if (!contentType) return c.notFound();
     const file = Bun.file(new URL(`../dist/${name}`, import.meta.url));
     if (!await file.exists()) return c.notFound();
-    const body = name === "style.css" && themeCss ? `${await file.text()}\n${themeCss}` : file;
+    const body = name === "style.css" ? `${await file.text()}\n${themeCss}` : file;
     return new Response(body, { headers: {
       "Content-Type": contentType,
       "Cache-Control": "no-store",

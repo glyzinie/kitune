@@ -1,0 +1,22 @@
+# example.jpのサービスが使う家族用Dex。storage・web・サービスのstaticClientsは別途設定します。
+issuer: https://auth.example.jp
+connectors:
+  - type: oidc
+    id: owner
+    name: 自分のDex
+    config:
+      issuer: https://auth.example.com
+      clientID: family-dex
+      clientSecret: $FAMILY_DEX_CLIENT_SECRET
+      redirectURI: https://auth.example.jp/callback
+      scopes: [profile, email, groups, offline_access]
+      pkceChallenge: S256
+      getUserInfo: true
+      insecureEnableGroups: true
+      claimModifications:
+        modifyGroupNames:
+          prefix: "owner:"
+
+# 他の家族は各人のDexを別の固定connector id・別のprefixで追加します。
+# owner:kitune:personal等のグループは、この接続元の自己申告属性です。
+# 家族サービスの利用許可・権限は接続元を踏まえ、サービス側のポリシーで判定します。

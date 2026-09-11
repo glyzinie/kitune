@@ -1,0 +1,12 @@
+.git
+.codex
+node_modules
+data
+backups
+deploy/local
+config.toml
+.env
+.env.local
+test-results
+playwright-report
+dist

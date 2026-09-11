@@ -1,0 +1,84 @@
+import { strict as assert } from "node:assert";
+import { randomBytes, createHash } from "node:crypto";
+import { mkdir } from "node:fs/promises";
+import { chromium, type Page } from "@playwright/test";
+import { createRuntime } from "../src/auth";
+import { createApp } from "../src/app";
+import { fixtureSettings, clientSecret } from "./helpers";
+
+let app: ReturnType<typeof createApp> | undefined;
+const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (r) => app ? app.fetch(r) : new Response("Starting", { status: 503 }) });
+const origin = `http://localhost:${server.port}`;
+const relyingParty = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("OIDC callback received") });
+const callbackURL = `http://127.0.0.1:${relyingParty.port}/callback`;
+const settings = fixtureSettings({ origin, users: [{ id: "owner", name: "テストユーザー", email: "owner@example.com", groups: ["personal"] }], clients: [{ id: "test-client", name: "テストサービス", redirect_uris: [callbackURL], secret_env: "TEST_CLIENT_SECRET", skip_consent: false }] });
+const runtime = await createRuntime(settings, { testing: true });
+app = createApp(runtime);
+let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+let page: Page | undefined;
+try {
+  browser = await chromium.launch({ headless: true, ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}) });
+  const context = await browser.newContext({ viewport: { width: 1366, height: 900 }, locale: "ja-JP" });
+  page = await context.newPage();
+  page.setDefaultTimeout(15_000);
+  const errors: string[] = [];
+  const urls: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("request", (request) => urls.push(request.url()));
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("WebAuthn.enable");
+  await cdp.send("WebAuthn.addVirtualAuthenticator", { options: { protocol: "ctap2", ctap2Version: "ctap2_1", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
+  await mkdir("test-results", { recursive: true });
+  const enrollmentURL = runtime.store.issueEnrollment("owner", origin);
+  await page.goto(enrollmentURL);
+  await page.getByRole("button", { name: "Passkeyを登録する", exact: true }).waitFor();
+  await page.screenshot({ path: "test-results/enrollment-desktop.png", fullPage: true });
+  await page.getByRole("button", { name: "Passkeyを登録する", exact: true }).click();
+  await page.waitForURL(`${origin}/account`);
+  assert(!urls.some((url) => url.includes(enrollmentURL.split("#")[1]!)), "Enrollment secret leaked into an HTTP URL");
+  assert.equal(await page.getByRole("heading", { name: "テストユーザー", exact: true }).count(), 1);
+  assert.equal(await page.locator(".item-list strong").filter({ hasText: /^Passkey$/ }).count(), 1, "Unknown authenticator should receive an automatic generic name");
+  await page.screenshot({ path: "test-results/account-desktop.png", fullPage: true });
+  page.once("dialog", (dialog) => dialog.accept("MacのPasskey"));
+  await page.getByRole("button", { name: "名前変更", exact: true }).click();
+  await page.getByText("MacのPasskey", { exact: true }).waitFor();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "削除", exact: true }).click();
+  await page.getByText("最後のログイン方法は削除できません。先に予備のPasskeyを登録してください。", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "ログアウト", exact: true }).first().click();
+  await page.waitForURL(`${origin}/login`);
+  await page.screenshot({ path: "test-results/login-desktop.png", fullPage: true });
+  const verifier = randomBytes(32).toString("base64url");
+  const query = new URLSearchParams({ client_id: "test-client", redirect_uri: callbackURL, response_type: "code", scope: "openid profile email groups offline_access", state: "browser-state", nonce: "browser-nonce", code_challenge_method: "S256", code_challenge: createHash("sha256").update(verifier).digest("base64url") });
+  await page.goto(`${origin}/api/auth/oauth2/authorize?${query}`);
+  await page.getByRole("button", { name: "Passkeyでログイン" }).click();
+  await page.waitForURL(`${origin}/consent?**`);
+  await page.getByRole("heading", { name: "テストサービスに接続" }).waitFor();
+  await page.screenshot({ path: "test-results/consent-desktop.png", fullPage: true });
+  await page.getByRole("button", { name: "許可して続ける" }).click();
+  await page.waitForURL(`${callbackURL}?**`);
+  const callback = new URL(page.url());
+  assert.equal(callback.searchParams.get("state"), "browser-state");
+  const tokenResponse = await fetch(`${origin}/api/auth/oauth2/token`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", authorization: `Basic ${Buffer.from(`test-client:${clientSecret}`).toString("base64")}` }, body: new URLSearchParams({ grant_type: "authorization_code", code: callback.searchParams.get("code")!, code_verifier: verifier, redirect_uri: callbackURL }) });
+  assert.equal(tokenResponse.status, 200, "Browser OIDC code exchange failed");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${origin}/account`);
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "Account screen overflows on mobile");
+  await page.screenshot({ path: "test-results/account-mobile.png", fullPage: true });
+  await page.goto(`${origin}/login`);
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "Login screen overflows on mobile");
+  await page.screenshot({ path: "test-results/login-mobile.png", fullPage: true });
+  assert.deepEqual(errors, [], "Browser JavaScript errors");
+  console.log("Browser integration passed: registration, login, key management, OIDC consent/code exchange, mobile layout and token privacy");
+} catch (error) {
+  if (page && !page.isClosed()) {
+    console.error("UI failure:", new URL(page.url()).pathname, await page.locator("#status").textContent().catch(() => ""));
+    await page.screenshot({ path: "test-results/failure.png", fullPage: true }).catch(() => {});
+  }
+  throw error;
+} finally {
+  await browser?.close();
+  await server.stop(true);
+  await relyingParty.stop(true);
+  runtime.close();
+}

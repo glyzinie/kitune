@@ -1,0 +1,42 @@
+origin = "http://localhost:3000"
+# 本番の例: origin = "https://id.example.com"
+name = "Kitune"
+
+[[users]]
+id = "owner"
+name = "自分"
+email = "owner@example.com"
+email_verified = false
+enabled = true
+# 複数IDをここに置くと、同じユーザーになります。数値ではなく文字列です。
+# Discordを使う場合だけ、環境変数DISCORD_CLIENT_ID / DISCORD_CLIENT_SECRETも設定します。
+discord_ids = []
+groups = ["personal"]
+
+# 別ユーザーに分ける場合は、別の固定id・メール・Discord IDを設定します。
+# [[users]]
+# id = "alternate"
+# name = "別アカウント"
+# email = "alternate@example.com"
+# discord_ids = ["333333333333333333"]
+# groups = []
+
+# Kituneには認証ブローカーを登録します。個人サービスはDexのstaticClientsへ登録します。
+[[clients]]
+id = "personal-dex"
+name = "自分のDex"
+redirect_uris = ["https://auth.example.com/callback"]
+# 省略時もclient_secret_basic。client_secret_postも選べます。
+token_endpoint_auth_method = "client_secret_basic"
+# 全クライアントで必須。環境変数に32文字以上の秘密値を設定してください。
+secret_env = "PERSONAL_DEX_CLIENT_SECRET"
+scopes = ["openid", "profile", "email", "groups", "offline_access"]
+skip_consent = false
+
+# 移行・検証用に別の認証ブローカーを追加できます。S256 PKCEは全クライアントで必須です。
+# [[clients]]
+# id = "migration-dex"
+# name = "移行先のDex"
+# redirect_uris = ["https://auth-next.example.com/callback"]
+# secret_env = "MIGRATION_DEX_CLIENT_SECRET"
+# scopes = ["openid", "profile", "email", "groups", "offline_access"]

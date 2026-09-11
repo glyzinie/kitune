@@ -1,0 +1,43 @@
+app = "kitune-example-auth"
+primary_region = "nrt"
+kill_signal = "SIGTERM"
+kill_timeout = 20
+
+[build]
+image = "ghcr.io/dexidp/dex:v2.45.1@sha256:8499afd690c437f52301efd2b05b2455da5bd2dfc20332cd697dc9937f808462"
+
+[processes]
+app = "dex serve /etc/dex/config.yaml"
+
+[[files]]
+guest_path = "/etc/dex/config.yaml"
+secret_name = "DEX_CONFIG"
+
+[[mounts]]
+source = "dex_data"
+destination = "/data"
+
+[http_service]
+processes = ["app"]
+internal_port = 5556
+force_https = true
+auto_stop_machines = "stop"
+auto_start_machines = true
+min_machines_running = 0
+
+[http_service.concurrency]
+type = "requests"
+soft_limit = 20
+hard_limit = 40
+
+[[http_service.checks]]
+method = "GET"
+path = "/healthz"
+interval = "30s"
+timeout = "5s"
+grace_period = "60s"
+
+[[vm]]
+cpu_kind = "shared"
+cpus = 1
+memory = "512mb"

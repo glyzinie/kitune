@@ -5,7 +5,7 @@
 | Kitune | `https://id.example.com` | `fly.toml`、`config.example.toml` |
 | 個人Dex | `https://auth.example.com` | `deploy/dex/fly.toml`、`deploy/dex/config.yaml` |
 
-各アプリはnrt・shared CPU 1基・512MB・Volume 1GB・1 Machineを初期値とします。未使用時はstopし、HTTP要求で起動します。Kituneのissuerは `{origin}/api/auth`、Dexのissuerは個人Dexのoriginです。既存環境を更新するときはissuer・connector ID・ユーザーID・Volumeを維持します。
+各アプリはnrt・shared CPU 1基・Volume 1GB・1 Machineを初期値とします。メモリはKituneが512MB、Dexが256MBで、Dexのswapは無効にします。未使用時はstopし、HTTP要求で起動します。Kituneのissuerは `{origin}/api/auth`、Dexのissuerは個人Dexのoriginです。既存環境を更新するときはissuer・connector ID・ユーザーID・Volumeを維持します。
 
 ## 非公開の設定
 
@@ -21,7 +21,7 @@ cp config.example.toml config.toml
 chmod 600 deploy/local/* config.toml
 ```
 
-コピーしたファイルのapp名・issuer・callback・ユーザーを編集します。Kitune側のクライアントは通常 `personal-dex` の1件です。個人サービス・家族／サークルDexの追加先は個人Dexの `staticClients` です。秘密値はFly Secretsへ保存し、Gitやイメージには含めません。
+コピーしたファイルのapp名・issuer・callback・ユーザーを編集します。Kituneの `[build].dockerfile` は、移動先の設定ファイルから見た `../../Dockerfile` に変更します。Kitune側のクライアントは通常 `personal-dex` の1件です。個人サービス・家族／サークルDexの追加先は個人Dexの `staticClients` です。秘密値はFly Secretsへ保存し、Gitやイメージには含めません。
 
 ## Dexの公式イメージ
 
@@ -38,7 +38,7 @@ chmod 600 deploy/local/* config.toml
 ```sh
 bun -e 'console.log("IDP_CONFIG=" + Buffer.from(await Bun.file("config.toml").text()).toString("base64"))' | fly secrets import --stage -c deploy/local/kitune.fly.toml
 fly config validate -c deploy/local/kitune.fly.toml
-fly deploy . -c deploy/local/kitune.fly.toml --dockerfile Dockerfile --remote-only --ha=false --strategy immediate
+fly deploy . -c deploy/local/kitune.fly.toml --remote-only --ha=false --strategy immediate
 
 bun -e 'console.log("DEX_CONFIG=" + Buffer.from(await Bun.file("deploy/local/dex.yaml").text()).toString("base64"))' | fly secrets import --stage -c deploy/local/dex.fly.toml
 fly config validate -c deploy/local/dex.fly.toml

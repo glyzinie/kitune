@@ -2,6 +2,7 @@ app = "kitune-example-auth"
 primary_region = "nrt"
 kill_signal = "SIGTERM"
 kill_timeout = 20
+swap_size_mb = 0
 
 [build]
 image = "ghcr.io/dexidp/dex:v2.45.1@sha256:8499afd690c437f52301efd2b05b2455da5bd2dfc20332cd697dc9937f808462"
@@ -40,4 +41,4 @@ grace_period = "60s"
 [[vm]]
 cpu_kind = "shared"
 cpus = 1
-memory = "512mb"
+memory = "256mb"

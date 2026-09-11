@@ -1,11 +1,8 @@
 app = "kitune-example-auth"
 primary_region = "nrt"
-kill_signal = "SIGTERM"
-kill_timeout = 20
-swap_size_mb = 0
 
 [build]
-image = "ghcr.io/dexidp/dex:v2.45.1@sha256:8499afd690c437f52301efd2b05b2455da5bd2dfc20332cd697dc9937f808462"
+image = "ghcr.io/dexidp/dex:v2.45.1"
 
 [processes]
 app = "dex serve /etc/dex/config.yaml"
@@ -22,6 +19,7 @@ destination = "/data"
 processes = ["app"]
 internal_port = 5556
 force_https = true
+
 auto_stop_machines = "suspend"
 auto_start_machines = true
 min_machines_running = 0

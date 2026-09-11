@@ -36,4 +36,6 @@
 
 Docker CLIからBuildxが見つからない場合は、`DOCKER_TEST_BUILDX` にインストール済みBuildxの実行ファイルを指定できます。今回のHomebrew環境では `DOCKER_TEST_BUILDX=/opt/homebrew/lib/docker/cli-plugins/docker-buildx bun run test:docker` で実行します。Apple SiliconのColimaではQEMUのAMD64エミュレーションでBun 1.4.0がAVX未対応・segmentation faultを報告しました。`QEMU_CPU=max` でも解消していません。AMD64版はFlyのリモートビルドと実機で別途検証し、Passkey・OIDC・停止からの起動を確認しています。GitHub ActionsでもAMD64・ARM64のネイティブランナーを使います。
 
+suspend試験ではcordonして10秒待ち、休止後にuncordonして新規通信による復帰を確認します。`fly machine suspend` 単独はProxyの自動休止時の通信停止処理を行わず、直後の要求が失敗する場合があります。CLIでの試験は自動休止の近似なので、無通信からの自動休止・復帰も別途確認してください。[Flyの自動休止時の処理](https://community.fly.io/t/fly-proxy-now-gracefully-terminates-websocket-connections-before-stopping-suspending-a-machine/27544)を参照してください。
+
 実アカウントのDiscord認可画面、実機Passkey、Flyのcold startとメモリは別の実環境確認です。ローカルテストの成功だけで実測済みとは扱いません。ログにはリクエストURL、Cookie、登録URL、OAuthレスポンス、秘密値を出力しません。

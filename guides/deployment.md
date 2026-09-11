@@ -25,11 +25,11 @@ chmod 600 deploy/local/kitune/* deploy/local/dex/*
 
 ## Dexの公式イメージ
 
-独自Dockerfileや起動スクリプトは不要です。`deploy/dex/fly.toml` の `[build].image` にDex 2.45.1の公式イメージをdigestで固定し、`[processes]` で `dex serve /etc/dex/config.yaml` を指定します。`[[files]]` で設定を渡し、SQLiteは `/data/dex.sqlite` に永続化します。
+独自Dockerfileや起動スクリプトは不要です。`deploy/dex/fly.toml` の `[build].image` にDex 2.45.1の公式イメージを指定し、`[processes]` で `dex serve /etc/dex/config.yaml` を指定します。`[http_service]` にも `processes = ["app"]` が必要です。`[[files]]` で設定を渡し、SQLiteは `/data/dex.sqlite` に永続化します。
 
 公式イメージはUID/GID 1001で動作します。新しいVolumeでは、初回起動前にVolumeをマウントしたメンテナンスMachineで `/data` を `1001:1001`、モード700に設定してください。既存Volumeでも所有者を確認します。設定ファイルはDexから読み取れる必要があります。YAMLの秘密値は `$PERSONAL_DEX_CLIENT_SECRET` などの環境変数参照とし、Fly Secretsで注入します。
 
-このdigestの公式イメージはSIGTERM時に `run groups: received signal terminated` と終了コード2を返します。停止の確認ではOOM・強制終了との区別と、再起動後のDB・署名鍵・トークン更新を確認してください。
+Dex 2.45.1の公式イメージはSIGTERM時に `run groups: received signal terminated` と終了コード2を返します。停止の確認ではOOM・強制終了との区別と、再起動後のDB・署名鍵・トークン更新を確認してください。
 
 ## 設定の反映
 

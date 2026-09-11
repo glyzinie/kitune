@@ -27,7 +27,7 @@ fly ssh console -C 'gosu bun bun /app/src/cli.ts recover owner'
 
 `recover` は対象のPasskeyとログイン状態を失効させます。Discordの紐付けは残ります。Discord自体を外す場合は設定を変更してください。設定変更後はSecretの更新と再起動で同期します。`sync` はその場でDBへ反映しますが、稼働プロセスのOIDCクライアント表示・origin等を再読込しないため、通常運用は再起動に統一します。
 
-アプリは非rootで実行します。コンテナ起動時のみVolumeと設定ファイルの所有権を調整します。SIGTERM後は最大15秒リクエストを待ち、DBを閉じます。
+アプリは非rootで実行します。コンテナ起動時のみVolumeと設定ファイルの所有権を調整します。SIGTERM／SIGINT後は最大15秒リクエストを待ち、DBを閉じます。この待機に合わせ、Kituneの `kill_timeout` は20秒を確保します。
 
 ## バックアップ
 

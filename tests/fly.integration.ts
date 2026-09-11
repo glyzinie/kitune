@@ -33,8 +33,9 @@ const json = async (url: string) => {
 };
 async function fly(...args: string[]) {
   const child = Bun.spawn(["fly", ...args], { stdout: "pipe", stderr: "pipe" });
-  const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+  const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
   // SSH output can contain an enrollment URL: never include it in error logs.
+  if (code !== 0 && args[0] === "machine") console.error(stderr.trim());
   assert.equal(code, 0, `fly ${args[0]} ${args[1]} failed`);
   return stdout.trim();
 }
@@ -48,8 +49,17 @@ const dexMachine = await machine(settings.dexApp);
 const cli = (...args: string[]) => fly("ssh", "console", "-a", settings.kituneApp, "--machine", kituneMachine,
   "-C", `gosu bun bun /app/src/cli.ts ${args.join(" ")}`);
 async function pause(app: string, id: string) {
-  if (lifecycle === "suspend") await fly("machine", "suspend", id, "-a", app, "--wait-timeout", "45s");
-  else await fly("machine", "stop", id, "-a", app, "--signal", "SIGTERM", "--timeout", "20", "--wait-timeout", "45s");
+  if (lifecycle === "suspend") {
+    // Drain traffic before manual suspension and expose the paused guest to
+    // autostart afterward. Actual Proxy autosuspend also needs a separate check.
+    try {
+      await fly("machine", "cordon", id, "-a", app);
+      await Bun.sleep(10_000);
+      await fly("machine", "suspend", id, "-a", app, "--wait-timeout", "45s");
+    } finally {
+      await fly("machine", "uncordon", id, "-a", app);
+    }
+  } else await fly("machine", "stop", id, "-a", app, "--signal", "SIGTERM", "--timeout", "20", "--wait-timeout", "45s");
   const state = JSON.parse(await fly("machine", "list", "-a", app, "--json"));
   assert.equal(state.find((m: { id: string }) => m.id === id)?.state, lifecycle === "suspend" ? "suspended" : "stopped");
 }
@@ -57,6 +67,11 @@ async function cold(app: string, id: string, url: string) {
   await pause(app, id);
   const start = performance.now();
   const response = await fetch(url, { signal: AbortSignal.timeout(55_000) });
+  if (response.status !== 200) {
+    const machines = JSON.parse(await fly("machine", "list", "-a", app, "--json"));
+    const current = machines.find((m: { id: string }) => m.id === id);
+    report.failedRecovery = { status: response.status, state: current?.state, events: current?.events };
+  }
   assert.equal(response.status, 200, "Cold request failed");
   await response.arrayBuffer();
   return Math.round(performance.now() - start);
@@ -67,6 +82,7 @@ const dexToken = (body: Record<string, string>) => dex.request("/token", {
 });
 
 let enrolled = false;
+let failure: unknown;
 try {
   const kituneDiscovery = await json(`${settings.kituneOrigin}/api/auth/.well-known/openid-configuration`);
   const dexDiscovery = await json(`${settings.dexOrigin}/.well-known/openid-configuration`);
@@ -173,8 +189,27 @@ try {
   assert((await dexToken({ grant_type: "refresh_token", refresh_token: tokens.refresh_token })).status >= 400, "Revoked upstream identity must not refresh through Dex");
   report.passed = true;
   console.log("Live revocation propagated to Dex refresh");
+} catch (error) {
+  failure = error;
+  throw error;
 } finally {
-  if (enrolled) await cli("recover", settings.smokeUser); // Remove the test key and grants; discard the replacement URL.
-  await mkdir("test-results", { recursive: true });
-  await writeFile(`test-results/fly-${lifecycle}.json`, JSON.stringify(report, null, 2), { mode: 0o600 });
+  try {
+    if (enrolled) {
+      // A failed wake-up may leave the Machine suspended and unable to accept SSH.
+      const machines = JSON.parse(await fly("machine", "list", "-a", settings.kituneApp, "--json"));
+      if (machines.find((m: { id: string }) => m.id === kituneMachine)?.state !== "started") {
+        await fly("machine", "start", kituneMachine, "-a", settings.kituneApp);
+      }
+      await json(`${settings.kituneOrigin}/healthz`);
+      await cli("recover", settings.smokeUser); // Remove the test key and grants; discard the replacement URL.
+    }
+  } catch (cleanupError) {
+    report.cleanupFailed = true;
+    report.passed = false;
+    if (!failure) throw cleanupError;
+    console.error("Test credential cleanup failed; restore the canonical configuration before using the service");
+  } finally {
+    await mkdir("test-results", { recursive: true });
+    await writeFile(`test-results/fly-${lifecycle}.json`, JSON.stringify(report, null, 2), { mode: 0o600 });
+  }
 }

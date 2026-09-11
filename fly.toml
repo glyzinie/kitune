@@ -1,8 +1,6 @@
 app = "kitune-example-id"
 primary_region = "nrt"
-kill_signal = "SIGTERM"
 kill_timeout = 20
-swap_size_mb = 0
 
 [build]
 dockerfile = "Dockerfile"
@@ -24,6 +22,7 @@ destination = "/data"
 [http_service]
 internal_port = 3000
 force_https = true
+
 auto_stop_machines = "suspend"
 auto_start_machines = true
 min_machines_running = 0

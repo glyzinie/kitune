@@ -33,7 +33,7 @@ async function createContainer(suffix: string, restore = false) {
   const volume = `${prefix}-${suffix}-data`, container = `${prefix}-${suffix}`;
   await docker(["volume", "create", "--label", "kitune.test=true", volume]); volumes.push(volume);
   await docker(["create", "--name", container, "--label", "kitune.test=true", "--platform", platform,
-    "--memory", "512m", "--memory-swap", "512m", "--cpus", "1", "--env-file", join(directory, "env"),
+    "--memory", "256m", "--memory-swap", "256m", "--cpus", "1", "--env-file", join(directory, "env"),
     "--mount", `type=volume,source=${volume},target=/data`, "--publish", `127.0.0.1:${port}:3000`, image,
     ...(restore ? ["sh", "-c", "bun src/cli.ts revoke-all && exec bun src/server.ts"] : []),
   ]); containers.push(container);
@@ -101,6 +101,8 @@ try {
   assert.equal(registered.status, 200);
   assert.equal((await registered.json()).name, "1Password");
   const tokens = await grant(agent);
+  // Several services may request tokens together after an idle period.
+  await Promise.all(Array.from({ length: 4 }, () => grant(agent)));
   const jwks = await (await agent.get("/api/auth/jwks")).json();
   const verify = (idToken: string) => jwtVerify(idToken, createLocalJWKSet(jwks), { issuer: `${origin}/api/auth`, audience: "test-client" });
   assert.equal((await verify(tokens.id_token)).payload.sub, "owner");
@@ -129,7 +131,7 @@ try {
   const integrity = await docker(["exec", restored, "gosu", "bun", "bun", "-e", 'import { Database } from "bun:sqlite"; const db = new Database("/data/kitune.sqlite", { readonly: true }); console.log(db.query("PRAGMA integrity_check").get().integrity_check); db.close();']);
   assert.equal(integrity, "ok");
   await stop(restored);
-  console.log(`Docker integration passed (${platform}, 1 CPU / 512MB): API suite, non-root, Passkey/OIDC, SIGTERM, Volume restart, backup restore, revocation and stable subject/JWKS`);
+  console.log(`Docker integration passed (${platform}, 1 CPU / 256MB, no swap): API suite, non-root, concurrent OIDC, Passkey/OIDC, SIGTERM, Volume restart, backup restore, revocation and stable subject/JWKS`);
 } finally {
   for (const container of containers.reverse()) await docker(["rm", "--force", container]);
   for (const volume of volumes.reverse()) await docker(["volume", "rm", volume]);

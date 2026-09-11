@@ -17,7 +17,9 @@ for (const app of [settings.kituneApp, settings.dexApp]) assert(/^[a-z0-9-]+$/.t
 for (const origin of [settings.kituneOrigin, settings.dexOrigin]) assert.equal(new URL(origin).protocol, "https:");
 const callback = "http://127.0.0.1:9876/callback";
 const client = "deployment-smoke";
-const report: Record<string, unknown> = { testedAt: new Date().toISOString() };
+const lifecycle = process.env.FLY_TEST_LIFECYCLE ?? "stop";
+assert(["stop", "suspend"].includes(lifecycle), "FLY_TEST_LIFECYCLE must be stop or suspend");
+const report: Record<string, unknown> = { testedAt: new Date().toISOString(), lifecycle };
 const jars = new Map<string, Agent>();
 for (const origin of [settings.kituneOrigin, settings.dexOrigin]) jars.set(origin, new Agent(
   request => fetch(request, { redirect: "manual", signal: AbortSignal.timeout(55_000) }), origin,
@@ -45,13 +47,14 @@ const kituneMachine = await machine(settings.kituneApp);
 const dexMachine = await machine(settings.dexApp);
 const cli = (...args: string[]) => fly("ssh", "console", "-a", settings.kituneApp, "--machine", kituneMachine,
   "-C", `gosu bun bun /app/src/cli.ts ${args.join(" ")}`);
-async function stop(app: string, id: string) {
-  await fly("machine", "stop", id, "-a", app, "--signal", "SIGTERM", "--timeout", "20", "--wait-timeout", "45s");
+async function pause(app: string, id: string) {
+  if (lifecycle === "suspend") await fly("machine", "suspend", id, "-a", app, "--wait-timeout", "45s");
+  else await fly("machine", "stop", id, "-a", app, "--signal", "SIGTERM", "--timeout", "20", "--wait-timeout", "45s");
   const state = JSON.parse(await fly("machine", "list", "-a", app, "--json"));
-  assert.equal(state.find((m: { id: string }) => m.id === id)?.state, "stopped");
+  assert.equal(state.find((m: { id: string }) => m.id === id)?.state, lifecycle === "suspend" ? "suspended" : "stopped");
 }
 async function cold(app: string, id: string, url: string) {
-  await stop(app, id);
+  await pause(app, id);
   const start = performance.now();
   const response = await fetch(url, { signal: AbortSignal.timeout(55_000) });
   assert.equal(response.status, 200, "Cold request failed");
@@ -148,15 +151,15 @@ try {
   for (let attempt = 0; attempt < 3; attempt++) {
     kituneCold.push(await cold(settings.kituneApp, kituneMachine, `${settings.kituneOrigin}/healthz`));
     dexCold.push(await cold(settings.dexApp, dexMachine, `${settings.dexOrigin}/.well-known/openid-configuration`));
-    console.log(`Cold start ${attempt + 1}: Kitune ${kituneCold.at(-1)}ms; Dex ${dexCold.at(-1)}ms`);
+    console.log(`${lifecycle} recovery ${attempt + 1}: Kitune ${kituneCold.at(-1)}ms; Dex ${dexCold.at(-1)}ms`);
   }
   report.kituneColdMs = kituneCold;
   report.dexColdMs = dexCold;
   assert.deepEqual(await json(kituneDiscovery.jwks_uri), kituneKeys);
   assert.deepEqual(await json(dexDiscovery.jwks_uri), dexKeys);
   assert.equal((await (await kitune.get("/api/auth/get-session")).json()).user.id, settings.smokeUser);
-  await stop(settings.dexApp, dexMachine);
-  await stop(settings.kituneApp, kituneMachine);
+  await pause(settings.dexApp, dexMachine);
+  await pause(settings.kituneApp, kituneMachine);
   const refreshStarted = performance.now();
   const refresh = await dexToken({ grant_type: "refresh_token", refresh_token: tokens.refresh_token });
   assert.equal(refresh.status, 200, "Refresh must wake up both Dex and Kitune");
@@ -173,5 +176,5 @@ try {
 } finally {
   if (enrolled) await cli("recover", settings.smokeUser); // Remove the test key and grants; discard the replacement URL.
   await mkdir("test-results", { recursive: true });
-  await writeFile("test-results/fly.json", JSON.stringify(report, null, 2), { mode: 0o600 });
+  await writeFile(`test-results/fly-${lifecycle}.json`, JSON.stringify(report, null, 2), { mode: 0o600 });
 }

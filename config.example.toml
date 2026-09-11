@@ -1,6 +1,8 @@
 origin = "http://localhost:3000"
 # 本番の例: origin = "https://id.example.com"
 name = "Kitune"
+# 任意のテーマカラー（#RRGGBB）。省略時は既定の配色を使います。
+# theme_color = "#2563eb"
 
 [[users]]
 id = "owner"

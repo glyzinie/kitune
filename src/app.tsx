@@ -5,11 +5,12 @@ import { setCookie } from "hono/cookie";
 import { APIError } from "better-auth/api";
 import type { Child } from "hono/jsx";
 import { assertFresh, ENROLLMENT_COOKIE, type Runtime } from "./auth";
+import { themeStyles } from "./theme";
 
 function Shell({ name, title, children, wide = false }: { name: string; title: string; children: Child; wide?: boolean }) {
   return <html lang="ja"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>{title} · {name}</title><link rel="stylesheet" href="/assets/style.css"/><script type="module" src="/assets/client.js"></script>
-  </head><body><header class="site-header"><a href="/" class="brand"><span class="brand-mark" aria-hidden="true">K</span>{name}</a><span class="header-note">自分のための、認証基盤。</span></header>
+  </head><body><header class="site-header"><a href="/" class="brand"><span class="brand-mark" aria-hidden="true">🦊</span>{name}</a><span class="header-note">自分のための、認証基盤。</span></header>
     <main class={wide ? "page page-wide" : "page"}>{children}<p id="status" role="status" aria-live="polite"></p></main>
     <footer>あなたのアカウントを、あなたの手で。</footer></body></html>;
 }
@@ -17,6 +18,7 @@ function Shell({ name, title, children, wide = false }: { name: string; title: s
 export function createApp(runtime: Runtime) {
   const { auth, store, settings } = runtime;
   const { config } = settings;
+  const themeCss = themeStyles(config.theme_color);
   const app = new Hono();
   app.use("*", bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({ message: "リクエストが大きすぎます。" }, 413) }));
   app.use("*", secureHeaders({
@@ -44,7 +46,11 @@ export function createApp(runtime: Runtime) {
     if (name !== "client.js" && name !== "style.css") return c.notFound();
     const file = Bun.file(new URL(`../dist/${name}`, import.meta.url));
     if (!await file.exists()) return c.notFound();
-    return new Response(file, { headers: { "Content-Type": name.endsWith("js") ? "text/javascript; charset=utf-8" : "text/css; charset=utf-8" } });
+    const body = name === "style.css" && themeCss ? `${await file.text()}\n${themeCss}` : file;
+    return new Response(body, { headers: {
+      "Content-Type": name.endsWith("js") ? "text/javascript; charset=utf-8" : "text/css; charset=utf-8",
+      "Cache-Control": "no-store",
+    } });
   });
   app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
   app.get("/.well-known/oauth-authorization-server/api/auth", (c) => auth.handler(c.req.raw));

@@ -7,9 +7,15 @@ import type { Child } from "hono/jsx";
 import { assertFresh, ENROLLMENT_COOKIE, type Runtime } from "./auth";
 import { themeStyles } from "./theme";
 
+const publicAssetTypes = new Map([
+  ["client.js", "text/javascript; charset=utf-8"],
+  ["style.css", "text/css; charset=utf-8"],
+  ["favicon.svg", "image/svg+xml"],
+]);
+
 function Shell({ name, title, children, wide = false }: { name: string; title: string; children: Child; wide?: boolean }) {
   return <html lang="ja"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <title>{title} · {name}</title><link rel="stylesheet" href="/assets/style.css"/><script type="module" src="/assets/client.js"></script>
+    <title>{title} · {name}</title><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg"/><link rel="stylesheet" href="/assets/style.css"/><script type="module" src="/assets/client.js"></script>
   </head><body><header class="site-header"><a href="/" class="brand"><span class="brand-mark" aria-hidden="true">🦊</span>{name}</a><span class="header-note">自分のための、認証基盤。</span></header>
     <main class={wide ? "page page-wide" : "page"}>{children}<p id="status" role="status" aria-live="polite"></p></main>
     <footer>あなたのアカウントを、あなたの手で。</footer></body></html>;
@@ -43,12 +49,13 @@ export function createApp(runtime: Runtime) {
   });
   app.get("/assets/:file", async (c) => {
     const name = c.req.param("file");
-    if (name !== "client.js" && name !== "style.css") return c.notFound();
+    const contentType = publicAssetTypes.get(name);
+    if (!contentType) return c.notFound();
     const file = Bun.file(new URL(`../dist/${name}`, import.meta.url));
     if (!await file.exists()) return c.notFound();
     const body = name === "style.css" && themeCss ? `${await file.text()}\n${themeCss}` : file;
     return new Response(body, { headers: {
-      "Content-Type": name.endsWith("js") ? "text/javascript; charset=utf-8" : "text/css; charset=utf-8",
+      "Content-Type": contentType,
       "Cache-Control": "no-store",
     } });
   });

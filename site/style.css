@@ -6,7 +6,7 @@
   --line: #d9ded3;
   --accent: #ac4827;
   --forest: #253d2f;
-  font-family: Inter, "Hiragino Sans", "Noto Sans JP", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: "LINE Seed JP", "Hiragino Sans", "Noto Sans JP", -apple-system, BlinkMacSystemFont, sans-serif;
   font-synthesis: none;
   color: var(--ink);
   background: var(--paper);
@@ -81,7 +81,7 @@ h1 span { color: var(--accent); }
 .connection::before { position: absolute; inset: 0 auto; content: ""; width: 1px; background: #aab5a2; }
 .connection span { position: relative; padding: 1px 12px; border: 1px solid #cdd4c4; border-radius: 15px; background: #e9ece3; color: #596651; font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.75rem; }
 .broker { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border: 1px solid #bac6b3; border-radius: 8px; background: #f7f8f2; }
-.broker-icon { display: grid; place-items: center; width: 31px; height: 34px; border: 1px solid #cbd5c4; border-radius: 5px; font-family: Georgia, serif; font-size: 1.5rem; }
+.broker-icon { display: grid; place-items: center; width: 31px; height: 34px; border: 1px solid #cbd5c4; border-radius: 5px; font-family: inherit; font-size: 1.5rem; }
 .broker strong { display: block; font-size: 0.9375rem; font-weight: 600; }
 .broker div > span { display: block; color: var(--muted); font-size: 0.75rem; }
 .broker-protocol { margin-left: auto; color: var(--muted); font-size: 0.75rem; }
@@ -102,7 +102,7 @@ h2 { font-size: clamp(1.8rem, 3.05vw, 2.5rem); line-height: 1.55; letter-spacing
 .feature-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px; margin-top: 44px; }
 .feature { display: flex; flex-direction: column; padding-top: 17px; border-top: 1px solid #aebaa6; }
 .feature-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 26px; }
-.feature-number { font-family: Georgia, serif; font-size: 1.75rem; font-style: italic; line-height: 1; color: var(--accent); }
+.feature-number { font-family: inherit; font-size: 1.75rem; font-style: normal; line-height: 1; color: var(--accent); }
 .feature-category { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.1em; }
 .feature h3 { font-size: 1.125rem; letter-spacing: -0.035em; }
 .feature p { margin-top: 15px; margin-bottom: 22px; color: var(--muted); font-size: 1rem; line-height: 1.95; }
@@ -147,7 +147,7 @@ pre code { font: inherit; }
 .docs-intro > p:last-child { margin-top: 18px; font-size: 1rem; color: var(--muted); line-height: 2; }
 .resource-list { border-top: 1px solid #bfc8b7; }
 .resource { display: grid; grid-template-columns: 26px 1fr 22px; align-items: center; gap: 20px; border-bottom: 1px solid var(--line); padding: 27px 0; text-decoration: none; }
-.resource-index { align-self: start; padding-top: 3px; font-family: Georgia, serif; font-style: italic; font-size: 1rem; color: var(--accent); }
+.resource-index { align-self: start; padding-top: 3px; font-family: inherit; font-style: normal; font-size: 1rem; color: var(--accent); }
 .resource h3 { font-size: 1.0625rem; }
 .resource p { margin-top: 5px; font-size: 0.875rem; color: var(--muted); }
 .resource-arrow { font-size: 1.35rem; transition: transform 160ms ease; }

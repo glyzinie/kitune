@@ -17,6 +17,8 @@ bun run site:dev
 - `site/script.js`: 導入コマンドのコピー。JavaScriptが無効でも本文とリンクは利用できます。
 - `site/favicon.svg`: 🦊のロゴ。
 
+日本語フォントはGoogle FontsのCDNからLINE Seed JP（Regular 400・Bold 700・ExtraBold 800）を読み込みます。`display=swap` を指定し、取得中やCDNに接続できない場合は端末のフォントで表示します。コードは等幅フォント、ロゴは端末の🦊絵文字です。
+
 アセットのURLは相対パスなので、リポジトリのサブパスでも配信できます。GitHubへのリンクは `glyzinie/Kitune` を参照しています。fork先で使う場合はリンクと `scripts/preview-site.ts` の `basePath` も更新してください。
 
 ## 初回公開

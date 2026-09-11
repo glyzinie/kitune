@@ -15,6 +15,7 @@ const publicAssetTypes = new Map([
 
 function Shell({ name, title, children, wide = false }: { name: string; title: string; children: Child; wide?: boolean }) {
   return <html lang="ja"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LINE+Seed+JP:wght@400;700;800&display=swap" referrerpolicy="no-referrer"/>
     <title>{title} · {name}</title><link rel="icon" type="image/svg+xml" href="/assets/favicon.svg"/><link rel="stylesheet" href="/assets/style.css"/><script type="module" src="/assets/client.js"></script>
   </head><body><header class="site-header"><a href="/" class="brand"><span class="brand-mark" aria-hidden="true">🦊</span>{name}</a><span class="header-note">自分のための、認証基盤。</span></header>
     <main class={wide ? "page page-wide" : "page"}>{children}<p id="status" role="status" aria-live="polite"></p></main>
@@ -28,7 +29,7 @@ export function createApp(runtime: Runtime) {
   const app = new Hono();
   app.use("*", bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({ message: "リクエストが大きすぎます。" }, 413) }));
   app.use("*", secureHeaders({
-    contentSecurityPolicy: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'"], imgSrc: ["'self'", "data:"], connectSrc: ["'self'"], frameAncestors: ["'none'"], baseUri: ["'none'"], formAction: ["'self'"] },
+    contentSecurityPolicy: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'", "https://fonts.googleapis.com"], fontSrc: ["'self'", "https://fonts.gstatic.com"], imgSrc: ["'self'", "data:"], connectSrc: ["'self'"], frameAncestors: ["'none'"], baseUri: ["'none'"], formAction: ["'self'"] },
     referrerPolicy: "no-referrer",
     strictTransportSecurity: config.origin.startsWith("https:") ? "max-age=31536000" : false,
     permissionsPolicy: { camera: [], microphone: [], geolocation: [] },

@@ -72,7 +72,13 @@ h1 span { color: var(--accent); }
 .login-methods { display: grid; grid-template-columns: 1fr 1fr; margin-top: 22px; border: 1px solid #e0e4d9; border-radius: 7px; }
 .login-method { display: grid; justify-items: center; padding: 15px 6px 13px; }
 .login-method + .login-method { border-left: 1px solid #e0e4d9; }
-.login-method svg { width: 25px; height: 25px; margin-bottom: 7px; }
+.login-method .passkey-icon {
+  width: 32px;
+  height: 32px;
+  color: var(--ink);
+  background: currentColor;
+  mask: url("https://fonts.gstatic.com/s/i/short-term/release/materialsymbolsrounded/passkey/default/24px.svg") center / contain no-repeat;
+}
 .login-method .provider-icon { width: 34px; height: 25px; object-fit: contain; margin-bottom: 7px; }
 .login-method strong { font-size: 0.9375rem; font-weight: 600; }
 .login-method span { color: var(--muted); font-size: 0.75rem; }

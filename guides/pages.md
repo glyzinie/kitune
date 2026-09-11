@@ -37,8 +37,9 @@ BunがCSS・JavaScript・faviconにハッシュ付きのファイル名を付け
 
 日本語フォントはGoogle FontsのCDNからLINE Seed JP（Regular 400・Bold 700・ExtraBold 800）を読み込みます。`display=swap` を指定し、取得中やCDNに接続できない場合は端末のフォントで表示します。コードは等幅フォント、ロゴは端末の🦊絵文字です。
 
-構成図のDiscord・Dexには公式ロゴを使い、色と縦横比を維持しています。名称も併記し、ロゴは装飾画像として扱います。
+構成図のDiscord・Dexには公式ロゴを使い、色と縦横比を維持しています。名称も併記し、アイコンとロゴは装飾として扱います。
 
+- Passkey: [Google Material Symbols](https://developers.google.com/fonts/docs/material_symbols)のRoundedスタイルの `passkey`（人と鍵）を使います。[Google CDNのSVG](https://fonts.gstatic.com/s/i/short-term/release/materialsymbolsrounded/passkey/default/24px.svg)をCSSマスクとして直接読み込み、サイトの文字色に合わせます。ライセンスはApache License 2.0です。
 - Discord: [公式ブランドページ](https://discord.com/branding)が使うWebflow CDNから、青紫色のClydeシンボルを直接読み込みます。
 - Dex: [公式サイトのロゴ](https://github.com/dexidp/website/blob/59a0f7028c56cccad806e8f8dd6553da4aef6d64/static/img/logos/dex-glyph-color.svg)をjsDelivr経由で読み込みます。配信元は第三者CDNですが、参照先を公式リポジトリのコミットに固定し、公式サイトと同一の素材を使っています。ロゴを含むカードはDexの公式サイトへリンクします。
 

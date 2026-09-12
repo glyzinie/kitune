@@ -98,3 +98,5 @@ GitHub ActionsはAMD64・ARM64それぞれのネイティブランナーでビ�
 GitHub Pages向けの日本語サイトのソースは `site/` にあります。`bun run site:dev` で編集用プレビュー、`bun run site:preview` でビルド済みのサイトを確認できます。Actionsは `bun run site:build` で `site/dist/` を生成し、その内容を公開します。生成物はGitに含めません。[編集と公開の手順](guides/pages.md)を参照してください。
 
 紹介サイトとアプリの日本語フォントには、Google FontsのCDNで配信されるLINE Seed JPを使用します。取得中やCDNに接続できない場合も、端末のフォントで表示します。
+
+アプリのPasskey・プロフィール・端末・操作アイコンは [Google Material Symbols](https://developers.google.com/fonts/docs/material_symbols) のRounded（Apache License 2.0）をGoogle CDNから読み込みます。Discordは[公式ブランド素材](https://discord.com/branding)のClydeを、紹介サイトと同じ固定CDN URLで表示します。アイコンには操作名を併記し、読み上げは文字に任せます。CDNに接続できない場合も、文字で操作を識別できます。

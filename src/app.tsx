@@ -15,6 +15,11 @@ const publicAssetTypes = new Map([
   ["favicon.svg", "image/svg+xml"],
 ]);
 
+function Icon({ name }: { name: "passkey" | "discord" | "person" | "devices" | "logout" | "add" | "edit" | "delete" }) {
+  if (name === "discord") return <img class="icon icon-discord" src="https://cdn.prod.website-files.com/6257adef93867e50d84d30e2/66e3d80db9971f10a9757c99_Symbol.svg" width="65" height="48" alt="" aria-hidden="true" decoding="async" referrerpolicy="no-referrer"/>;
+  return <span class={`icon icon-${name}`} aria-hidden="true"></span>;
+}
+
 function Shell({ name, title, children, wide = false }: { name: string; title: string; children: Child; wide?: boolean }) {
   return <html lang="ja"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LINE+Seed+JP:wght@400;700;800&display=swap" referrerpolicy="no-referrer"/>
@@ -31,7 +36,7 @@ export function createApp(runtime: Runtime) {
   const app = new Hono();
   app.use("*", bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({ message: "リクエストが大きすぎます。" }, 413) }));
   app.use("*", secureHeaders({
-    contentSecurityPolicy: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'", "https://fonts.googleapis.com"], fontSrc: ["'self'", "https://fonts.gstatic.com"], imgSrc: ["'self'", "data:"], connectSrc: ["'self'"], frameAncestors: ["'none'"], baseUri: ["'none'"], formAction: ["'self'"] },
+    contentSecurityPolicy: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'", "https://fonts.googleapis.com"], fontSrc: ["'self'", "https://fonts.gstatic.com"], imgSrc: ["'self'", "data:", "https://fonts.gstatic.com", "https://cdn.prod.website-files.com"], connectSrc: ["'self'"], frameAncestors: ["'none'"], baseUri: ["'none'"], formAction: ["'self'"] },
     referrerPolicy: "no-referrer",
     strictTransportSecurity: config.origin.startsWith("https:") ? "max-age=31536000" : false,
     permissionsPolicy: { camera: [], microphone: [], geolocation: [] },
@@ -83,14 +88,14 @@ export function createApp(runtime: Runtime) {
   app.get("/login", (c) => c.html(<Shell name={config.name} title="ログイン"><section class="card login-card">
     <p class="eyebrow">YOUR PERSONAL IDENTITY</p><h1>おかえりなさい。</h1><p class="lede">Passkeyで、いつものサービスへ。</p>
     {c.req.query("error") && <p class="notice">ログインできませんでした。許可されたアカウントを選ぶか、もう一度お試しください。</p>}
-    <button class="primary full" data-action="login-passkey"><span aria-hidden="true">↗</span> Passkeyでログイン</button>
-    {settings.discord && <><div class="divider"><span>または</span></div><button class="secondary full" data-action="login-discord">Discordでログイン</button></>}
+    <button class="primary full with-icon" data-action="login-passkey"><Icon name="passkey"/>Passkeyでログイン</button>
+    {settings.discord && <><div class="divider"><span>または</span></div><button class="secondary full with-icon" data-action="login-discord"><Icon name="discord"/>Discordでログイン</button></>}
     <p class="help">端末の指紋・顔認証やPINを使います。<br/>初めての方は、管理者から受け取った登録URLを開いてください。</p>
     <button class="text-button" data-action="switch-account">別のアカウントを使う</button>
   </section></Shell>));
   app.get("/enroll", (c) => c.html(<Shell name={config.name} title="Passkeyの初回登録"><section class="card login-card">
     <p class="eyebrow">FIRST STEP</p><h1>あなたのPasskeyを。</h1><p class="lede">この端末やパスワードマネージャーに保存して、<br/>パスワードなしでログインできます。</p>
-    <button class="primary full" data-action="enroll">Passkeyを登録する</button><p class="help">登録URLは15分間、一度だけ使えます。<br/>登録をキャンセルした場合は、期限内にやり直せます。</p>
+    <button class="primary full with-icon" data-action="enroll"><Icon name="passkey"/>Passkeyを登録する</button><p class="help">登録URLは15分間、一度だけ使えます。<br/>登録をキャンセルした場合は、期限内にやり直せます。</p>
     <p class="help">保存先に合わせて名前を付けます。名前はあとで変更できます。</p>
     <a class="subtle-link" href="/login">ログイン画面へ</a>
   </section></Shell>));
@@ -125,15 +130,15 @@ export function createApp(runtime: Runtime) {
       throw error;
     });
     const discord = store.db.query<{ accountId: string }, [string]>("SELECT accountId FROM account WHERE userId = ? AND providerId = 'discord' ORDER BY accountId").all(user.id);
-    return c.html(<Shell name={config.name} title="アカウント" wide><div class="page-heading"><div><p class="eyebrow">YOUR ACCOUNT</p><h1>{user.name}</h1><p class="lede">ログイン方法と、利用中の端末を管理します。</p></div><button class="secondary" data-action="logout">ログアウト</button></div>
-      <div class="account-grid"><section class="card"><h2>Passkey</h2><p class="section-note">予備の端末にも登録しておくと安心です。</p>
-        <ul class="item-list">{passkeys.map((key) => <li><div><strong>{key.name || "名前のないPasskey"}</strong><small>{key.backedUp ? "同期されたPasskey" : "端末・セキュリティキー"}</small></div><div class="row-actions"><button class="text-button" data-action="rename-passkey" data-id={key.id} data-name={key.name || ""}>名前変更</button><button class="text-button danger" data-action="delete-passkey" data-id={key.id}>削除</button></div></li>)}</ul>
+    return c.html(<Shell name={config.name} title="アカウント" wide><div class="page-heading"><div><p class="eyebrow">YOUR ACCOUNT</p><h1>{user.name}</h1><p class="lede">ログイン方法と、利用中の端末を管理します。</p></div><button class="secondary with-icon" data-action="logout"><Icon name="logout"/>ログアウト</button></div>
+      <div class="account-grid"><section class="card"><h2 class="icon-heading"><Icon name="passkey"/>Passkey</h2><p class="section-note">予備の端末にも登録しておくと安心です。</p>
+        <ul class="item-list">{passkeys.map((key) => <li><div><strong>{key.name || "名前のないPasskey"}</strong><small>{key.backedUp ? "同期されたPasskey" : "端末・セキュリティキー"}</small></div><div class="row-actions"><button class="text-button with-icon" data-action="rename-passkey" data-id={key.id} data-name={key.name || ""}><Icon name="edit"/>名前変更</button><button class="text-button danger with-icon" data-action="delete-passkey" data-id={key.id}><Icon name="delete"/>削除</button></div></li>)}</ul>
         {!passkeys.length && <p class="empty">Passkeyはまだ登録されていません。</p>}
-        <button class="primary" data-action="add-passkey">Passkeyを追加</button><p class="help">保存先に合わせて名前を付けます。名前はあとで変更できます。</p>
+        <button class="primary with-icon" data-action="add-passkey"><Icon name="add"/>Passkeyを追加</button><p class="help">保存先に合わせて名前を付けます。名前はあとで変更できます。</p>
         <p class="help">設定変更には10分以内のログインが必要です。<a href="/login">もう一度ログイン</a></p>
-      </section><aside class="card profile-card"><h2>プロフィール</h2><dl><dt>ユーザーID</dt><dd>{user.id}</dd><dt>メール</dt><dd>{user.email}</dd><dt>ローカルグループ</dt><dd>{(JSON.parse(user.groups) as string[]).join("、") || "なし"}</dd></dl><h2>Discord</h2>{discord.length ? <ul class="discord-list">{discord.map((account) => <li>{account.accountId}</li>)}</ul> : <p class="section-note">連携なし</p>}<p class="help">プロフィールとDiscordの連携は管理者が設定します。</p></aside></div>
-      <section class="card sessions-card"><h2>ログイン中の端末</h2>
-        {sessions ? <ul class="item-list">{sessions.map((entry) => <li><div><strong>{entry.id === session.session.id ? "この端末" : "別の端末"}</strong><small>{entry.userAgent || "端末情報なし"}</small><small>ログイン：{new Date(entry.createdAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</small></div><button class="text-button danger" data-action="revoke-session" data-id={entry.id}>ログアウト</button></li>)}</ul>
+      </section><aside class="card profile-card"><h2 class="icon-heading"><Icon name="person"/>プロフィール</h2><dl><dt>ユーザーID</dt><dd>{user.id}</dd><dt>メール</dt><dd>{user.email}</dd><dt>ローカルグループ</dt><dd>{(JSON.parse(user.groups) as string[]).join("、") || "なし"}</dd></dl><h2 class="icon-heading"><Icon name="discord"/>Discord</h2>{discord.length ? <ul class="discord-list">{discord.map((account) => <li>{account.accountId}</li>)}</ul> : <p class="section-note">連携なし</p>}<p class="help">プロフィールとDiscordの連携は管理者が設定します。</p></aside></div>
+      <section class="card sessions-card"><h2 class="icon-heading"><Icon name="devices"/>ログイン中の端末</h2>
+        {sessions ? <ul class="item-list">{sessions.map((entry) => <li><div><strong>{entry.id === session.session.id ? "この端末" : "別の端末"}</strong><small>{entry.userAgent || "端末情報なし"}</small><small>ログイン：{new Date(entry.createdAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</small></div><button class="text-button danger with-icon" data-action="revoke-session" data-id={entry.id}><Icon name="logout"/>ログアウト</button></li>)}</ul>
           : <p class="section-note">ログイン中の端末を確認するには、<a href="/login">もう一度ログイン</a>してください。</p>}
       </section>
     </Shell>);

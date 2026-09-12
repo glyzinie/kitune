@@ -1,4 +1,4 @@
-FROM oven/bun:1.4.0 AS build
+FROM oven/bun:1.4.2 AS build
 WORKDIR /app
 COPY package.json bun.lock ./
 # Keep downloads bounded in small Docker build environments.
@@ -8,7 +8,7 @@ COPY src ./src
 COPY scripts ./scripts
 RUN bun run check && bun run build
 
-FROM oven/bun:1.4.0-slim
+FROM oven/bun:1.4.2-slim
 LABEL org.opencontainers.image.title="Kitune" \
     org.opencontainers.image.description="Passkey and Discord personal OIDC provider" \
     org.opencontainers.image.source="https://github.com/glyzinie/kitune"

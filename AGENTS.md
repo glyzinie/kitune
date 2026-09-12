@@ -1,6 +1,6 @@
 # Kitune
 
-- Bun 1.4.0を使用する。依存バージョンは `package.json` と `bun.lock` が正。
+- Bun 1.4.2を使用する。依存バージョンは `package.json` と `bun.lock` が正。
 - ユーザー・Discord紐付け・OIDCクライアントは設定を唯一の管理元にする。
 - 認証フロー・失効・DB変更時は [開発・検証](guides/development.md) を読む。
 - Fly・秘密値・バックアップを扱うときは [運用](guides/operations.md) を読む。

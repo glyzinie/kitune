@@ -1,10 +1,10 @@
 # GitHub Pagesの紹介サイト
 
-`site/` にKituneの日本語紹介サイトのソースを置いています。Bun 1.4.0のHTMLビルドでCSS・JavaScriptを圧縮し、公開用ファイルを `site/dist/` に生成します。追加の依存インストールは不要です。認証サーバー本体はGitHub Pagesでは実行できません。
+`site/` にKituneの日本語紹介サイトのソースを置いています。Bun 1.4.2のHTMLビルドでCSS・JavaScriptを圧縮し、公開用ファイルを `site/dist/` に生成します。追加の依存インストールは不要です。認証サーバー本体はGitHub Pagesでは実行できません。
 
 ## ローカルで確認する
 
-Bun 1.4.0で次を実行し、表示されたURLを開きます。
+Bun 1.4.2で次を実行し、表示されたURLを開きます。
 
 ```sh
 bun run site:dev

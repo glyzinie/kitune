@@ -1,6 +1,6 @@
 # Kitune
 
-PasskeyとDiscordだけでログインする、認証ブローカー向けの個人用OIDC認証元。Better Auth 1.7.4・Hono 4.13.7・Bun 1.4.0・SQLiteで動作します。
+PasskeyとDiscordだけでログインする、認証ブローカー向けの個人用OIDC認証元。Better Auth 1.7.4・Hono 4.13.7・Bun 1.4.2・SQLiteで動作します。
 
 各人が自分のDexを持つ構成です。自分のKitune（`id.example.com`）→自分のDex（`auth.example.com`）→家族Dex（`auth.example.jp`）／サークルDex（`auth.example.net`）へつなぎます。他の参加者も各人のDexを接続します。[構成と役割分担](guides/federation.md)を参照してください。Kituneと個人DexのFly構成は[配置手順](guides/deployment.md)にまとめています。
 

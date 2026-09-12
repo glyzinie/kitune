@@ -3,9 +3,6 @@ origin = "http://localhost:3000"
 name = "Kitune"
 # 配色のプリセット: lavender / blue / sage / amber。未指定時は amber。
 theme = "amber"
-# 任意の色（#RRGGBB）を使う場合は theme を削除し、以下を指定します。
-# 両方指定した場合は theme を優先します。
-# theme_color = "#2563eb"
 
 [[users]]
 id = "owner"

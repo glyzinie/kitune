@@ -50,7 +50,6 @@ export const configSchema = z.strictObject({
   origin,
   name: z.string().trim().min(1).max(100).default("Kitune"),
   theme: z.enum(themeNames).optional(),
-  theme_color: z.string().regex(/^#[0-9a-f]{6}$/i, "Use a six-digit hex color, for example #2563eb").optional(),
   users: z.array(userSchema).min(1),
   clients: z.array(clientSchema).default([]),
 }).superRefine((config, ctx) => {

@@ -10,7 +10,7 @@
 - クライアントは `secret_env` 必須の機密クライアントのみです。`none`、設定した秘密値の欠落・32文字未満は起動時にDB作成・同期前に拒否します。既存の機密クライアント設定とDBスキーマは維持し、古い公開クライアントを暗黙に変換しません。
 - Providerが許容するnative loopback URIの可変ポートも、このIdPでは認可前フックで拒否します。開発用クライアントを含め、設定したリダイレクトURIとの完全一致が必要です。
 - `@better-auth/passkey` 1.7.4は検証時のUV必須設定がありません。登録・認証の検証後フックで署名検証済みの `userVerified` を確認します。認証オプションの `userVerification` はブラウザで `required` にします。
-- Passkey名は同じ検証後フックでAAGUIDから補います。対応表は `src/passkey-names.ts` に同梱し、登録中の外部問い合わせは行いません。手動指定名は保持し、未知・全ゼロのAAGUIDは「Passkey」にします。対応表の出典は [Passkey Provider AAGUIDs](https://github.com/passkeydeveloper/passkey-authenticator-aaguids)。AAGUIDは表示名の候補にのみ使用し、提供元の真正性や認証可否の判断には使いません。
+- Passkey名は同じ検証後フックでAAGUIDから補います。`@better-auth/passkey` の [`getAuthenticatorName`](https://better-auth.com/docs/plugins/passkey#naming-passkeys-by-authenticator) を使い、登録中の外部問い合わせは行いません。手動指定名は保持し、ライブラリに未収録・全ゼロのAAGUIDは「Passkey」にします。AAGUIDは表示名の候補にのみ使用し、提供元の真正性や認証可否の判断には使いません。
 - UVの検証は認証器が返すフラグの検証です。[passkeys.devの既知の問題](https://passkeys.dev/docs/reference/known-issues/)には、一部のブラウザ拡張が確認操作なしでUVを立てる実装が掲載されています。実際のPIN・生体認証の操作までサーバーが独立に証明できるものではありません。
 - 登録URLの秘密はURL fragmentからPOSTし、HttpOnly Cookieに格納します。GETのquery、ログ、通常セッションには入れません。未ログイン登録では `createSession=true` を必須とし、プラグインのトランザクション内で登録権とPasskey保存を一体化しています。
 - ユーザー情報とPasskeyを扱うAPIでは有効状態を確認します。ユーザーのepochが変わった既存セッションは無効です。セッション削除時には関連grantも削除します。

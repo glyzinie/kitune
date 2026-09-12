@@ -1,13 +1,12 @@
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { jwt } from "better-auth/plugins";
-import { passkey } from "@better-auth/passkey";
+import { getAuthenticatorName, passkey } from "@better-auth/passkey";
 import { oauthProvider } from "@better-auth/oauth-provider";
 import { getMigrations } from "better-auth/db/migration";
 import { parse as parseCookie } from "hono/utils/cookie";
 import { scopes, type Settings } from "./config";
 import { hash, openDatabase, Store } from "./store";
-import { passkeyName } from "./passkey-names";
 
 export const ENROLLMENT_COOKIE = "kitune-enrollment";
 export const FRESH_AGE = 10 * 60;
@@ -147,7 +146,7 @@ export async function createRuntime(settings: Settings, options: { testing?: boo
               if (ctx.body?.createSession !== true) throw new APIError("BAD_REQUEST");
               store.consumeEnrollment(enrollmentCookie(ctx.request) ?? "", user.id);
             }
-            return { name: passkeyName(verification.registrationInfo.aaguid) };
+            return { name: getAuthenticatorName(verification.registrationInfo.aaguid) ?? "Passkey" };
           },
         },
         authentication: {

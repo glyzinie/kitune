@@ -33,35 +33,7 @@ const presets: Record<ThemeName, Palette> = {
   },
 };
 
-function customPalette(color: string): Palette {
-  const rgb = [1, 3, 5].map((offset) => parseInt(color.slice(offset, offset + 2), 16));
-  const mix = (channels: number[], target: number, amount: number) =>
-    channels.map((channel) => Math.round(channel * (1 - amount) + target * amount));
-  const hex = (channels: number[]) => `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
-  const luminance = (channels: number[]) => channels.reduce((sum, channel, index) => {
-    const value = channel / 255;
-    return sum + (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4) * [0.2126, 0.7152, 0.0722][index]!;
-  }, 0);
-
-  // Preserve the configured primary color while keeping text readable.
-  const darkText = luminance(rgb) > 0.179;
-  const secondaryHover = mix(rgb, 235, 0.9);
-  let text = rgb;
-  // This is the darkest surface used behind accent text.
-  while ((luminance(secondaryHover) + 0.05) / (luminance(text) + 0.05) < 4.5) text = mix(text, 0, 0.1);
-  return {
-    background: hex(mix(rgb, 255, 0.94)), surface: "#ffffff",
-    foreground: hex(mix(rgb, 28, 0.9)), muted: hex(mix(rgb, 95, 0.9)),
-    border: hex(mix(rgb, 214, 0.85)), "input-border": hex(mix(rgb, 120, 0.9)),
-    color, contrast: darkText ? "#000000" : "#ffffff",
-    hover: hex(mix(rgb, darkText ? 255 : 0, 0.12)), text: hex(text),
-    secondary: hex(mix(rgb, 248, 0.93)), "secondary-hover": hex(secondaryHover),
-    "secondary-text": hex(text),
-  };
-}
-
-/** Config validation limits these values to known presets and hex colors. */
-export function themeStyles({ theme, theme_color }: { theme?: ThemeName; theme_color?: string }) {
-  const palette = theme ? presets[theme] : theme_color ? customPalette(theme_color) : presets.amber;
+export function themeStyles({ theme }: { theme?: ThemeName }) {
+  const palette = presets[theme ?? "amber"];
   return `:root{${Object.entries(palette).map(([name, value]) => `--theme-${name}:${value}`).join(";")}}`;
 }

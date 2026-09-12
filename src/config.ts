@@ -39,6 +39,8 @@ const clientSchema = z.strictObject({
     error: "Only confidential clients using client_secret_basic or client_secret_post are supported",
   }).default("client_secret_basic"),
   secret_env: envName,
+  // Keep omission distinct from true so existing client fingerprints stay stable.
+  require_pkce: z.boolean().optional(),
   scopes: z.array(z.enum(scopes)).min(1).default([...scopes]),
   skip_consent: z.boolean().default(false),
   enabled: z.boolean().default(true),

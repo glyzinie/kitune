@@ -1,8 +1,8 @@
 # Kitune
 
-PasskeyとDiscordだけでログインする、認証ブローカー向けの個人用OIDC認証元。Better Auth 1.7.4・Hono 4.13.7・Bun 1.4.2・SQLiteで動作します。
+PasskeyとDiscordだけでログインする、個人用OIDC認証元。Better Auth 1.7.4・Hono 4.13.7・Bun 1.4.2・SQLiteで動作します。
 
-各人が自分のDexを持つ構成です。自分のKitune（`id.example.com`）→自分のDex（`auth.example.com`）→家族Dex（`auth.example.jp`）／サークルDex（`auth.example.net`）へつなぎます。他の参加者も各人のDexを接続します。[構成と役割分担](guides/federation.md)を参照してください。Kituneと個人DexのFly構成は[配置手順](guides/deployment.md)にまとめています。
+secretを保持できるWebサービスは、自分のKitune（`id.example.com`）へ直接接続します。家族・サークルで複数の認証元を1つにまとめる場合だけ、共有Dexを任意で挟めます。[構成と役割分担](guides/federation.md)と[Fly配置手順](guides/deployment.md)を参照してください。
 
 ## はじめる
 
@@ -39,17 +39,19 @@ Discordを使う場合は `users[].discord_ids` と環境変数 `DISCORD_CLIENT_
 
 ## OIDC接続
 
-Kituneの正式な検証対象はDexです。各サービスは個人Dexへ接続し、サービスごとのOIDC互換性対応・クライアント管理はDex側で行います。サービスのKituneへの直接接続は正式サポート対象外です。他の認証ブローカーは同じ接続条件で検証してから対応対象へ追加します。
+secretを安全に保持できるWebサーバーごとに独立したクライアントIDとsecretを発行し、Kituneへ直接接続します。SPA・ネイティブアプリ・公開クライアント・動的クライアント登録には対応しません。複数の認証元を選択させる家族・サークル用の共有Dexは、通常の機密クライアントとしてKituneへ直接接続できます。
 
 issuerは `{origin}/api/auth`、Discoveryは `{origin}/api/auth/.well-known/openid-configuration` です。
 
-対応scopeは `openid profile email groups offline_access`。認可コード＋S256 PKCEとローテーション付きrefresh tokenを提供します。クライアントsecretを安全に保持できる機密クライアントだけを登録できます。全クライアントでPKCEと `secret_env` が必須です。認証方式は `client_secret_basic`（既定）と `client_secret_post` に対応します。
+対応scopeは `openid profile email groups offline_access`。認可コード、S256 PKCE、ローテーション付きrefresh tokenを提供します。`secret_env` と32文字以上のsecretは全クライアントで必須です。認証方式は `client_secret_basic`（既定）と `client_secret_post` に対応します。
 
-`[[clients]]` は複数設定できます。通常は個人Dexの1件とし、移行・検証時に別のブローカーを追加します。公開クライアントの `none`、`secret_env` の省略、必要な秘密値の欠落は起動時にエラーとなります。以前の公開クライアント設定は暗黙に変換せず、サービスの接続先をDexへ移してから設定を更新してください。既存の機密クライアント設定はそのまま利用でき、DBスキーマ・issuer・ユーザーID・署名鍵の移行は不要です。
+`[[clients]]` は複数設定できます。`require_pkce` の省略時はS256 PKCE必須です。PKCEを送信できない機密Webクライアントに限り、個別に `require_pkce = false` を設定できます。例外クライアントからS256 challengeが送られた場合もverifierを検証し、`plain` は拒否します。PKCEなしで `offline_access` を要求する場合は、`openid` と空でない `nonce` も必要です。
+
+公開クライアントの `none`、`secret_env` の省略、必要な秘密値の欠落は起動時にエラーとなります。クライアント設定を変更すると、そのクライアントの未使用コードとgrantだけを失効させます。設定を省略した既存クライアントは従来と同じfingerprintを維持するため、`require_pkce` の追加だけで一括失効は起きません。
 
 ID／アクセストークンは15分、refresh tokenは30日、認可コードは5分、Kituneのセッションは7日です。設定からの失効後も、外部サービスが既に作ったセッションやオフライン検証されるIDトークンは各期限まで残り得ます。
 
-[個人Dex接続例](examples/dex.yaml)と[家族](examples/family-dex.yaml)・[サークル](examples/circle-dex.yaml)の接続例に、各段の `offline_access`、S256 PKCE、UserInfo取得、接続元別のグループ接頭辞を含めています。
+[Headscale 0.29.3・Gitea 1.27.3・Tailscaleの接続例](examples/web-services.md)と、任意の[家族](examples/family-dex.yaml)・[サークル](examples/circle-dex.yaml)共有Dex例を用意しています。直接接続時の `sub` はKituneに設定した固定ユーザーIDで、`groups` は `personal` などの元の値です。接続先変更時に、既存サービスの利用者をメール一致で自動移行しません。
 
 ## 管理・検証
 

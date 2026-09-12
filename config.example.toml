@@ -23,22 +23,37 @@ groups = ["personal"]
 # discord_ids = ["333333333333333333"]
 # groups = []
 
-# Kituneには認証ブローカーを登録します。個人サービスはDexのstaticClientsへ登録します。
+# secretを保持できるWebサービスごとに、別のclient IDとsecretを登録します。
+# この例はHeadscale 0.29.3です。Headscale側でもS256 PKCEを有効にします。
 [[clients]]
-id = "personal-dex"
-name = "自分のDex"
-redirect_uris = ["https://auth.example.com/callback"]
+id = "headscale"
+name = "Headscale"
+redirect_uris = ["https://headscale.example.com/oidc/callback"]
 # 省略時もclient_secret_basic。client_secret_postも選べます。
 token_endpoint_auth_method = "client_secret_basic"
-# 全クライアントで必須。環境変数に32文字以上の秘密値を設定してください。
-secret_env = "PERSONAL_DEX_CLIENT_SECRET"
-scopes = ["openid", "profile", "email", "groups", "offline_access"]
+# 全クライアントで必須。環境変数に32文字以上のsecretを設定してください。
+secret_env = "HEADSCALE_CLIENT_SECRET"
+scopes = ["openid", "profile", "email"]
 skip_consent = false
+# require_pkceは省略時trueです。既定のS256必須を維持するため省略しています。
 
-# 移行・検証用に別の認証ブローカーを追加できます。S256 PKCEは全クライアントで必須です。
+# Gitea 1.27.3の外部OIDCクライアントはPKCEを送らないため、このクライアントだけ例外にします。
+# Giteaの認証ソース名はkitune、callbackはその名前を含む固定URLです。
 # [[clients]]
-# id = "migration-dex"
-# name = "移行先のDex"
-# redirect_uris = ["https://auth-next.example.com/callback"]
-# secret_env = "MIGRATION_DEX_CLIENT_SECRET"
-# scopes = ["openid", "profile", "email", "groups", "offline_access"]
+# id = "gitea"
+# name = "Gitea"
+# redirect_uris = ["https://gitea.example.com/user/oauth2/kitune/callback"]
+# secret_env = "GITEA_CLIENT_SECRET"
+# scopes = ["openid", "profile", "email"]
+# require_pkce = false
+# skip_consent = false
+
+# Tailscaleの互換性用初期設定です。PKCEの実挙動を確認できたらtrueへ戻します。
+# [[clients]]
+# id = "tailscale"
+# name = "Tailscale"
+# redirect_uris = ["https://login.tailscale.com/a/oauth_response"]
+# secret_env = "TAILSCALE_CLIENT_SECRET"
+# scopes = ["openid", "profile", "email"]
+# require_pkce = false
+# skip_consent = false

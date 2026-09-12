@@ -9,23 +9,19 @@ import { Agent, Authenticator } from "./helpers";
 const settingsPath = process.env.FLY_TEST_SETTINGS;
 assert(settingsPath, "Set FLY_TEST_SETTINGS to a private JSON file with test settings");
 const settings = await Bun.file(settingsPath).json() as {
-  kituneOrigin: string; dexOrigin: string; kituneApp: string; dexApp: string;
-  smokeUser: string; smoke: string;
+  kituneOrigin: string; kituneApp: string; smokeUser: string; smoke: string;
 };
 assert(/^deploy-test-[a-z0-9]+$/.test(settings.smokeUser), "Only a disposable deployment test user may be enrolled/revoked");
-for (const app of [settings.kituneApp, settings.dexApp]) assert(/^[a-z0-9-]+$/.test(app));
-for (const origin of [settings.kituneOrigin, settings.dexOrigin]) assert.equal(new URL(origin).protocol, "https:");
+assert(/^[a-z0-9-]+$/.test(settings.kituneApp));
+assert.equal(new URL(settings.kituneOrigin).protocol, "https:");
 const callback = "http://127.0.0.1:9876/callback";
 const client = "deployment-smoke";
 const lifecycle = process.env.FLY_TEST_LIFECYCLE ?? "stop";
 assert(["stop", "suspend"].includes(lifecycle), "FLY_TEST_LIFECYCLE must be stop or suspend");
 const report: Record<string, unknown> = { testedAt: new Date().toISOString(), lifecycle };
-const jars = new Map<string, Agent>();
-for (const origin of [settings.kituneOrigin, settings.dexOrigin]) jars.set(origin, new Agent(
-  request => fetch(request, { redirect: "manual", signal: AbortSignal.timeout(55_000) }), origin,
-));
-const kitune = jars.get(settings.kituneOrigin)!;
-const dex = jars.get(settings.dexOrigin)!;
+const kitune = new Agent(
+  request => fetch(request, { redirect: "manual", signal: AbortSignal.timeout(55_000) }), settings.kituneOrigin,
+);
 const json = async (url: string) => {
   const response = await fetch(url, { signal: AbortSignal.timeout(55_000) });
   assert.equal(response.status, 200, `${new URL(url).pathname} status`);
@@ -45,7 +41,6 @@ async function machine(app: string) {
   return machines[0].id as string;
 }
 const kituneMachine = await machine(settings.kituneApp);
-const dexMachine = await machine(settings.dexApp);
 const cli = (...args: string[]) => fly("ssh", "console", "-a", settings.kituneApp, "--machine", kituneMachine,
   "-C", `gosu bun bun /app/src/cli.ts ${args.join(" ")}`);
 async function pause(app: string, id: string) {
@@ -76,7 +71,7 @@ async function cold(app: string, id: string, url: string) {
   await response.arrayBuffer();
   return Math.round(performance.now() - start);
 }
-const dexToken = (body: Record<string, string>) => dex.request("/token", {
+const kituneToken = (body: Record<string, string>) => kitune.request("/api/auth/oauth2/token", {
   method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", authorization: `Basic ${Buffer.from(`${client}:${settings.smoke}`).toString("base64")}` },
   body: new URLSearchParams(body),
 });
@@ -85,13 +80,10 @@ let enrolled = false;
 let failure: unknown;
 try {
   const kituneDiscovery = await json(`${settings.kituneOrigin}/api/auth/.well-known/openid-configuration`);
-  const dexDiscovery = await json(`${settings.dexOrigin}/.well-known/openid-configuration`);
   assert.equal(kituneDiscovery.issuer, `${settings.kituneOrigin}/api/auth`);
-  assert.equal(dexDiscovery.issuer, settings.dexOrigin);
   assert.equal((await kitune.get("/login")).status, 200);
   assert.equal((await kitune.get("/assets/client.js")).status, 200);
   const kituneKeys = await json(kituneDiscovery.jwks_uri);
-  const dexKeys = await json(dexDiscovery.jwks_uri);
   console.log("Live TLS, Discovery, JWKS and UI assets passed");
 
   const output = await cli("enroll", settings.smokeUser);
@@ -114,29 +106,21 @@ try {
 
   const verifier = randomBytes(32).toString("base64url");
   const state = randomBytes(20).toString("hex"), nonce = randomBytes(20).toString("hex");
-  const params = new URLSearchParams({ client_id: client, redirect_uri: callback, response_type: "code", scope: "openid profile email groups offline_access federated:id",
+  const params = new URLSearchParams({ client_id: client, redirect_uri: callback, response_type: "code", scope: "openid profile email groups offline_access",
     state, nonce, code_challenge_method: "S256", code_challenge: createHash("sha256").update(verifier).digest("base64url") });
-  let target = `${settings.dexOrigin}/auth?${params}`;
-  let kituneConsent = false, dexConsent = false;
-  for (let hop = 0; hop < 20 && !target.startsWith(callback); hop++) {
+  let target = `${settings.kituneOrigin}/api/auth/oauth2/authorize?${params}`;
+  let consentExercised = false;
+  for (let hop = 0; hop < 8 && !target.startsWith(callback); hop++) {
     const url = new URL(target);
-    const jar = jars.get(url.origin);
-    assert(jar, "Unexpected redirect origin");
-    let response = await jar.get(target);
-    if (response.status === 200 && url.origin === settings.kituneOrigin && url.pathname === "/consent") {
-      kituneConsent = true;
+    assert.equal(url.origin, settings.kituneOrigin, "Unexpected redirect origin");
+    const response = await kitune.get(target);
+    if (response.status === 200 && url.pathname === "/consent") {
+      consentExercised = true;
       const consent = await kitune.post("/api/auth/oauth2/consent", { accept: true, oauth_query: url.search.slice(1) });
       assert.equal(consent.status, 200);
       const result = await consent.json();
       target = new URL(result.redirect_uri ?? result.url, target).href;
       continue;
-    }
-    if (response.status === 200 && url.origin === settings.dexOrigin && url.pathname === "/approval") {
-      dexConsent = true;
-      const html = await response.text();
-      const req = html.match(/name="req" value="([^"]+)"/)?.[1];
-      assert(req, "Dex approval form missing");
-      response = await dex.request(target, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ req, approval: "approve" }) });
     }
     assert(response.status >= 300 && response.status < 400, `Flow status ${response.status} at ${url.origin}${url.pathname}`);
     assert(response.headers.get("location"));
@@ -145,51 +129,56 @@ try {
   const result = new URL(target);
   assert.equal(`${result.origin}${result.pathname}`, callback);
   assert.equal(result.searchParams.get("state"), state);
-  assert(kituneConsent && dexConsent, "Both consent screens must be exercised");
+  assert(consentExercised, "Kitune consent screen must be exercised");
   const code = result.searchParams.get("code");
   assert(code, "Authorization code missing");
-  const exchange = await dexToken({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: callback });
-  assert.equal(exchange.status, 200, "Dex authorization code exchange");
+  const exchange = await kituneToken({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: callback });
+  assert.equal(exchange.status, 200, "Kitune authorization code exchange");
   let tokens = await exchange.json();
-  const verify = (jwt: string) => jwtVerify(jwt, createLocalJWKSet(dexKeys), { issuer: settings.dexOrigin, audience: client });
+  const verify = (jwt: string) => jwtVerify(jwt, createLocalJWKSet(kituneKeys), { issuer: kituneDiscovery.issuer, audience: client });
   const { payload } = await verify(tokens.id_token);
+  assert.equal(payload.sub, settings.smokeUser);
   assert.equal(payload.nonce, nonce);
   assert.equal(payload.exp! - payload.iat!, 900);
-  assert.deepEqual(payload.groups, ["kitune:deployment-test"]);
-  assert.deepEqual(payload.federated_claims, { connector_id: "kitune", user_id: settings.smokeUser });
-  const info = await dex.request("/userinfo", { headers: { authorization: `Bearer ${tokens.access_token}` } });
+  assert.deepEqual(payload.groups, ["deployment-test"]);
+  const info = await kitune.request("/api/auth/oauth2/userinfo", { headers: { authorization: `Bearer ${tokens.access_token}` } });
   assert.equal(info.status, 200);
-  assert.equal((await info.json()).sub, payload.sub);
-  assert((await dexToken({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: callback })).status >= 400);
-  console.log("Kitune -> personal Dex login, consent, S256, JWT signatures, groups, UserInfo and code replay rejection passed");
+  const userInfo = await info.json();
+  assert.equal(userInfo.sub, settings.smokeUser);
+  assert.deepEqual(userInfo.groups, ["deployment-test"]);
+  // Code replay intentionally revokes the tokens issued for that code in Better
+  // Auth. Its rejection is covered by auth.test.ts; keep this grant for recovery.
+  console.log("Direct Kitune login, consent, S256, JWT signatures, stable subject, groups and UserInfo passed");
 
-  const kituneCold: number[] = [], dexCold: number[] = [];
+  const kituneCold: number[] = [];
   for (let attempt = 0; attempt < 3; attempt++) {
     kituneCold.push(await cold(settings.kituneApp, kituneMachine, `${settings.kituneOrigin}/healthz`));
-    dexCold.push(await cold(settings.dexApp, dexMachine, `${settings.dexOrigin}/.well-known/openid-configuration`));
-    console.log(`${lifecycle} recovery ${attempt + 1}: Kitune ${kituneCold.at(-1)}ms; Dex ${dexCold.at(-1)}ms`);
+    console.log(`${lifecycle} recovery ${attempt + 1}: Kitune ${kituneCold.at(-1)}ms`);
   }
   report.kituneColdMs = kituneCold;
-  report.dexColdMs = dexCold;
   assert.deepEqual(await json(kituneDiscovery.jwks_uri), kituneKeys);
-  assert.deepEqual(await json(dexDiscovery.jwks_uri), dexKeys);
   assert.equal((await (await kitune.get("/api/auth/get-session")).json()).user.id, settings.smokeUser);
-  await pause(settings.dexApp, dexMachine);
   await pause(settings.kituneApp, kituneMachine);
   const refreshStarted = performance.now();
-  const refresh = await dexToken({ grant_type: "refresh_token", refresh_token: tokens.refresh_token });
-  assert.equal(refresh.status, 200, "Refresh must wake up both Dex and Kitune");
+  const previousRefresh = tokens.refresh_token;
+  const refresh = await kituneToken({ grant_type: "refresh_token", refresh_token: previousRefresh });
+  assert.equal(refresh.status, 200, "Refresh must wake up Kitune");
   tokens = await refresh.json();
-  report.chainRefreshColdMs = Math.round(performance.now() - refreshStarted);
+  report.refreshColdMs = Math.round(performance.now() - refreshStarted);
+  assert.notEqual(tokens.refresh_token, previousRefresh);
   assert.equal((await verify(tokens.id_token)).payload.sub, payload.sub);
-  console.log(`Refresh woke up both services in ${report.chainRefreshColdMs}ms; subject and signing keys survived restart`);
+  const refreshedInfo = await kitune.request("/api/auth/oauth2/userinfo", { headers: { authorization: `Bearer ${tokens.access_token}` } });
+  assert.equal(refreshedInfo.status, 200, "Refreshed grant must remain valid until explicit revocation");
+  console.log(`Refresh woke Kitune in ${report.refreshColdMs}ms; subject and signing keys survived restart`);
 
   await cli("revoke", settings.smokeUser);
   assert.equal(await (await kitune.get("/api/auth/get-session")).json(), null);
-  assert((await dexToken({ grant_type: "refresh_token", refresh_token: tokens.refresh_token })).status >= 400, "Revoked upstream identity must not refresh through Dex");
+  assert((await kituneToken({ grant_type: "refresh_token", refresh_token: tokens.refresh_token })).status >= 400, "Revoked identity could still refresh");
+  assert((await kitune.request("/api/auth/oauth2/userinfo", { headers: { authorization: `Bearer ${tokens.access_token}` } })).status >= 400, "Revoked access token could still reach UserInfo");
   report.passed = true;
-  console.log("Live revocation propagated to Dex refresh");
+  console.log("Live revocation invalidated the direct Kitune session, refresh token and access token");
 } catch (error) {
+  report.passed = false;
   failure = error;
   throw error;
 } finally {

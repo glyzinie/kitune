@@ -140,15 +140,15 @@ export class Store {
         if (old && old.fingerprint !== fingerprint) this.revokeClient(client.id);
         this.db.query(`INSERT INTO oauthClient(id, clientId, clientSecret, disabled, name, scopes, redirectUris, postLogoutRedirectUris,
           tokenEndpointAuthMethod, grantTypes, responseTypes, applicationType, requirePKCE, skipConsent, subjectType, enableEndSession, createdAt, updatedAt)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'web', 1, ?, 'public', 1, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'web', ?, ?, 'public', 1, ?, ?)
           ON CONFLICT(clientId) DO UPDATE SET clientSecret=excluded.clientSecret, disabled=excluded.disabled, name=excluded.name,
           scopes=excluded.scopes, redirectUris=excluded.redirectUris, postLogoutRedirectUris=excluded.postLogoutRedirectUris,
-          tokenEndpointAuthMethod=excluded.tokenEndpointAuthMethod, grantTypes=excluded.grantTypes, requirePKCE=1,
+          tokenEndpointAuthMethod=excluded.tokenEndpointAuthMethod, grantTypes=excluded.grantTypes, requirePKCE=excluded.requirePKCE,
           skipConsent=excluded.skipConsent, updatedAt=excluded.updatedAt`).run(
           randomUUID(), client.id, secretHash, Number(!client.enabled), client.name, JSON.stringify(client.scopes),
           JSON.stringify(client.redirect_uris), JSON.stringify(client.post_logout_redirect_uris), client.token_endpoint_auth_method,
           JSON.stringify(["authorization_code", ...(client.scopes.includes("offline_access") ? ["refresh_token"] : [])]),
-          JSON.stringify(["code"]), Number(client.skip_consent), now, now,
+          JSON.stringify(["code"]), Number(client.require_pkce ?? true), Number(client.skip_consent), now, now,
         );
         this.db.query("INSERT INTO kituneClient(id, fingerprint) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET fingerprint=excluded.fingerprint").run(client.id, fingerprint);
       }

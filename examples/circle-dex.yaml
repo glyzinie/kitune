@@ -1,11 +1,12 @@
-# example.netのサービスが使うサークル用Dex。storage・web・サービスのstaticClientsは別途設定します。
+# example.netのサービスが使う任意のサークル用共有Dex。
+# storage・web・サービスのstaticClientsは別途設定します。
 issuer: https://auth.example.net
 connectors:
   - type: oidc
     id: owner
-    name: 自分のDex
+    name: 自分のKitune
     config:
-      issuer: https://auth.example.com
+      issuer: https://id.example.com/api/auth
       clientID: circle-dex
       clientSecret: $CIRCLE_DEX_CLIENT_SECRET
       redirectURI: https://auth.example.net/callback
@@ -17,5 +18,6 @@ connectors:
         modifyGroupNames:
           prefix: "owner:"
 
-# 他のメンバーも各人のDexを別の固定connector id・別のprefixで追加します。
-# 個人が申告したグループを、サークルの管理者権限として無条件に扱わないでください。
+# KituneにはclientID circle-dex、上記callback、同じsecret、S256 PKCE必須で登録します。
+# 他のメンバーも各人のKituneまたは認証元を、別の固定connector idとsecretで直接追加します。
+# owner:personal等のグループを、サークルの管理者権限として無条件に扱わないでください。

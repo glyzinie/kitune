@@ -25,7 +25,7 @@ bun run site:preview
 
 次のソースとビルドスクリプトはGitに含めます。
 
-- `site/index.html`: 紹介、認証構成、導入手順、既存ガイドへのリンク。
+- `site/index.html`: Kituneからサービスへ直接接続する構成、サービス別のOIDC例、導入手順、既存ガイドへのリンク。
 - `site/style.css`: デザインとモバイル対応。
 - `site/script.js`: 導入コマンドのコピー。JavaScriptが無効でも本文とリンクは利用できます。
 - `site/favicon.svg`: 🦊のロゴ。
@@ -37,11 +37,18 @@ BunがCSS・JavaScript・faviconにハッシュ付きのファイル名を付け
 
 日本語フォントはGoogle FontsのCDNからLINE Seed JP（Regular 400・Bold 700・ExtraBold 800）を読み込みます。`display=swap` を指定し、取得中やCDNに接続できない場合は端末のフォントで表示します。コードは等幅フォント、ロゴは端末の🦊絵文字です。
 
-構成図のDiscord・Dexには公式ロゴを使い、色と縦横比を維持しています。名称も併記し、アイコンとロゴは装飾として扱います。
+構成図ではKituneからHeadscale・Gitea・Tailscaleへ直接接続する流れを示します。家族・サークル用の共有Dexは、複数のKituneを集約するときだけ使う選択肢として本文で説明します。名称も併記し、アイコンとロゴは装飾として扱います。
 
 - Passkey: [Google Material Symbols](https://developers.google.com/fonts/docs/material_symbols)のRoundedスタイルの `passkey`（人と鍵）を使います。[Google CDNのSVG](https://fonts.gstatic.com/s/i/short-term/release/materialsymbolsrounded/passkey/default/24px.svg)をCSSマスクとして直接読み込み、サイトの文字色に合わせます。ライセンスはApache License 2.0です。
 - Discord: [公式ブランドページ](https://discord.com/branding)が使うWebflow CDNから、青紫色のClydeシンボルを直接読み込みます。
-- Dex: [公式サイトのロゴ](https://github.com/dexidp/website/blob/59a0f7028c56cccad806e8f8dd6553da4aef6d64/static/img/logos/dex-glyph-color.svg)をjsDelivr経由で読み込みます。配信元は第三者CDNですが、参照先を公式リポジトリのコミットに固定し、公式サイトと同一の素材を使っています。ロゴを含むカードはDexの公式サイトへリンクします。
+
+サービス別の接続例は、secretを保持できるWebサーバーを対象にしています。Kituneではサービスごとに異なるクライアントIDと32文字以上のsecretを用意し、基本scopeを `openid profile email` とします。PKCEはS256が既定で必須です。GiteaなどPKCE非対応の接続先だけ、該当クライアントに `require_pkce = false` を指定します。公開クライアントやSPA・ネイティブアプリはこのサイトの対象外です。
+
+- Headscale 0.29.3: `pkce.enabled: true` と `method: S256` を有効にし、callbackは `https://headscale.example.com/oidc/callback` とします。
+- Gitea 1.27.3: 認証ソース名を `kitune` とし、callbackは `https://gitea.example.com/user/oauth2/kitune/callback`。 `require_pkce = false` とし、 `offline_access` は付けません。
+- Tailscale: callbackは `https://login.tailscale.com/a/oauth_response`。WebFingerのhrefをKituneのissuer（例: `https://id.example.com/api/auth`）にし、Discoveryのissuerと一致させます。初期設定は `client_secret_basic` とします。PKCE送信と実サービスの接続は未確認です。
+
+直接接続時の `sub` はKituneに設定した固定ユーザーID、 `groups` は `personal` など元の値です。既存サービスの利用者をメール一致で自動移行しません。
 
 ローカルのCSS・JavaScript・faviconは相対パスなので、リポジトリのサブパスでも配信できます。GitHubへのリンクは `glyzinie/Kitune` を参照しています。fork先で使う場合はリンクと `scripts/preview-site.ts` の `basePath` も更新してください。
 

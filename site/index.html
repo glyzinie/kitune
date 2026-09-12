@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f5f5ef">
     <title>Kitune — 自分のための、認証基盤。</title>
-    <meta name="description" content="PasskeyとDiscordでログインする、個人用のOIDC認証元。Kituneと自分のDexで、サービスや家族・サークルにつながる認証基盤をつくれます。">
+    <meta name="description" content="PasskeyとDiscordでログインする、個人用のOIDC認証元。Kituneからサービスへ直接接続し、家族・サークルでは共有Dexも選べます。">
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ja_JP">
     <meta property="og:site_name" content="Kitune">
     <meta property="og:title" content="Kitune — 自分のための、認証基盤。">
-    <meta property="og:description" content="PasskeyとDiscordでログイン。自分のDexを通じて、いつものサービスへ。">
+    <meta property="og:description" content="PasskeyとDiscordでログイン。Kituneから、いつものサービスへ直接接続。">
     <link rel="icon" type="image/svg+xml" href="./favicon.svg">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LINE+Seed+JP:wght@400;700;800&amp;display=swap" referrerpolicy="no-referrer">
     <link rel="stylesheet" href="./style.css">
@@ -22,6 +22,7 @@
       <a class="brand" href="./" aria-label="Kitune ホーム"><span class="brand-mark" aria-hidden="true">🦊</span>Kitune<span class="brand-reading">きつね</span></a>
       <nav aria-label="メインナビゲーション">
         <a href="#features">特徴</a>
+        <a href="#services">接続例</a>
         <a href="#start">はじめる</a>
         <a href="#docs">ドキュメント</a>
         <a class="github-link" href="https://github.com/glyzinie/Kitune">GitHub <span aria-hidden="true">↗</span></a>
@@ -33,7 +34,7 @@
         <div class="hero-copy">
           <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>YOUR PERSONAL IDENTITY</p>
           <h1 id="hero-title">自分の認証を、<br><span>自分の手に。</span></h1>
-          <p class="hero-description">PasskeyとDiscordでログインする、<br class="desktop-break">個人用のOIDC認証元。<br>自分のDexを通じて、いつものサービスへ。</p>
+          <p class="hero-description">PasskeyとDiscordでログインする、<br class="desktop-break">個人用のOIDC認証元。<br>Kituneからサービスへ、直接つながります。</p>
           <div class="hero-actions">
             <a class="button button-primary" href="#start">Kituneをはじめる <span aria-hidden="true">↗</span></a>
             <a class="source-link" href="https://github.com/glyzinie/Kitune">ソースコードを見る <span aria-hidden="true">↗</span></a>
@@ -52,9 +53,8 @@
             <div class="identity-bottom"><span>ひとつのユーザーID</span><code>sub: owner</code></div>
           </div>
           <div class="connection"><span>OpenID Connect</span></div>
-          <a class="broker" href="https://dexidp.io/" aria-label="Dexの公式サイト"><img class="broker-icon" src="https://cdn.jsdelivr.net/gh/dexidp/website@59a0f7028c56cccad806e8f8dd6553da4aef6d64/static/img/logos/dex-glyph-color.svg" width="112" height="109" alt="" decoding="async" referrerpolicy="no-referrer"><div><strong>あなたのDex</strong><span>サービスへの接続をまとめる</span></div><span class="broker-protocol">OIDC</span></a>
-          <div class="destinations"><span>個人サービス</span><span>家族Dex</span><span>サークルDex</span></div>
-          <p class="map-note">認証は手元に。つながりは、その先へ。</p>
+          <div class="destinations" aria-label="直接接続するサービス"><span>Headscale</span><span>Gitea</span><span>Tailscale</span></div>
+          <p class="map-note">Kituneから直接接続。共有Dexは、複数のKituneを集約するときだけ。</p>
         </figure>
       </section>
 
@@ -81,12 +81,67 @@
           </article>
           <article class="feature">
             <div class="feature-top"><span class="feature-number">03</span><span class="feature-category">CONNECT</span></div>
-            <h3>自分のDexから、広がる。</h3>
-            <p>サービスとの接続は個人Dexに集約。家族やサークルのDexともつなぎ、各サービスで権限を管理します。</p>
+            <h3>サービスへ、直接つながる。</h3>
+            <p>Headscale・Gitea・Tailscaleなどへ、Kituneから独立したOIDCクライアントで接続。複数のKituneをまとめるときだけ、家族・サークル用の共有Dexを組み合わせます。</p>
             <a class="feature-footnote text-link" href="https://github.com/glyzinie/Kitune/blob/main/guides/federation.md">認証の構成を見る <span aria-hidden="true">↗</span></a>
           </article>
         </div>
-        <div class="protocol-note"><span class="protocol-label">BUILT ON OIDC</span><p>認可コード + S256 PKCE、ローテーション付きrefresh tokenに対応。接続先は、クライアントsecretを保持できる認証ブローカーです。正式な検証対象はDexです。</p></div>
+        <div class="protocol-note"><span class="protocol-label">BUILT ON OIDC</span><p>認可コード + S256 PKCE、ローテーション付きrefresh tokenに対応。接続先は、クライアントsecretを保持できるWebサーバーです。PKCEは既定でS256必須、非対応サービスだけクライアントごとに<code>require_pkce = false</code>を指定できます。公開クライアントは対象にしません。</p></div>
+      </section>
+
+      <section class="services-section wrap section-space" id="services" aria-labelledby="services-title">
+        <div class="section-heading"><p class="eyebrow">DIRECT OIDC CONNECTIONS</p><h2 id="services-title">使うサービスへ、<br class="mobile-break">Kituneから。</h2></div>
+        <p class="services-lede">サービスごとに別のクライアントIDとsecretを登録します。基本scopeは<code>openid profile email</code>、認証方式は<code>client_secret_basic</code>が既定です。必要に応じて<code>client_secret_post</code>も選べます。実サービスへの接続確認は利用環境で行い、ここでは設定例と互換性の範囲を示します。</p>
+        <div class="service-grid">
+          <article class="service-card">
+            <div class="service-top"><span class="service-number">01</span><span class="service-version">HEADSCALE 0.29.3</span></div>
+            <h3>Headscale</h3>
+            <p>Headscale側でPKCEを有効にし、S256を使います。</p>
+            <pre class="service-code" tabindex="0" aria-label="Headscale用Kituneクライアント設定"><code>id = "headscale"
+name = "Headscale"
+redirect_uris = ["https://headscale.example.com/oidc/callback"]
+secret_env = "HEADSCALE_CLIENT_SECRET"
+scopes = ["openid", "profile", "email"]
+# 省略時はS256 PKCE必須</code></pre>
+            <dl class="service-facts">
+              <div><dt>callback</dt><dd><code>https://headscale.example.com/oidc/callback</code></dd></div>
+              <div><dt>Headscale側</dt><dd><code>pkce.enabled: true</code> / <code>method: S256</code></dd></div>
+            </dl>
+          </article>
+          <article class="service-card">
+            <div class="service-top"><span class="service-number">02</span><span class="service-version">GITEA 1.27.3</span></div>
+            <h3>Gitea</h3>
+            <p>外部OIDCクライアントがPKCE・nonceを送らないため、このクライアントだけ例外にします。</p>
+            <pre class="service-code" tabindex="0" aria-label="Gitea用Kituneクライアント設定"><code>id = "gitea"
+name = "Gitea"
+redirect_uris = ["https://gitea.example.com/user/oauth2/kitune/callback"]
+secret_env = "GITEA_CLIENT_SECRET"
+scopes = ["openid", "profile", "email"]
+require_pkce = false</code></pre>
+            <dl class="service-facts">
+              <div><dt>認証ソース</dt><dd><code>kitune</code></dd></div>
+              <div><dt>callback</dt><dd><code>https://gitea.example.com/user/oauth2/kitune/callback</code></dd></div>
+              <div><dt>注意</dt><dd><code>offline_access</code>は付けません</dd></div>
+            </dl>
+          </article>
+          <article class="service-card">
+            <div class="service-top"><span class="service-number">03</span><span class="service-version">TAILSCALE</span></div>
+            <h3>Tailscale</h3>
+            <p>互換性確認用の初期例です。WebFingerのissuerとDiscoveryのissuerを一致させ、まずBasic認証で接続します。</p>
+            <pre class="service-code" tabindex="0" aria-label="Tailscale用Kituneクライアント設定"><code>id = "tailscale"
+name = "Tailscale"
+redirect_uris = ["https://login.tailscale.com/a/oauth_response"]
+secret_env = "TAILSCALE_CLIENT_SECRET"
+scopes = ["openid", "profile", "email"]
+require_pkce = false</code></pre>
+            <dl class="service-facts">
+              <div><dt>callback</dt><dd><code>https://login.tailscale.com/a/oauth_response</code></dd></div>
+              <div><dt>issuer</dt><dd><code>https://id.example.com/api/auth</code>（WebFingerとDiscoveryで一致）</dd></div>
+              <div><dt>境界</dt><dd>実サービスへの接続とPKCE送信の挙動は未確認</dd></div>
+            </dl>
+          </article>
+        </div>
+        <p class="services-note">直接接続時の<code>sub</code>はKituneで設定した固定ユーザーID、<code>groups</code>は<code>personal</code>など元の値です。共有Dexは複数の認証元をまとめる場合の選択肢として残ります。</p>
       </section>
 
       <section class="start-section" id="start" aria-labelledby="start-title">
@@ -103,7 +158,7 @@ bun install --frozen-lockfile</code></pre></div>
             </li>
             <li>
               <div class="step-heading"><span class="step-number">2</span><h3>自分の設定で、起動する</h3></div>
-              <p class="step-description"><code>config.toml</code>のユーザー・クライアントを編集し、<code>.env</code>に<code>BETTER_AUTH_SECRET</code>と<code>PERSONAL_DEX_CLIENT_SECRET</code>を設定します。各秘密値は<code>openssl rand -hex 32</code>などで個別に生成してください。</p>
+              <p class="step-description"><code>config.toml</code>のユーザー・クライアントを編集し、<code>.env</code>に<code>BETTER_AUTH_SECRET</code>と各クライアントの<code>secret_env</code>で指定した32文字以上のsecretを設定します。秘密値は<code>openssl rand -hex 32</code>などで個別に生成してください。PKCEは省略時にS256必須、非対応サービスだけ<code>require_pkce = false</code>を指定します。</p>
               <div class="code-block"><div class="code-toolbar"><span>TERMINAL</span><button type="button" class="copy-button" data-copy="start-code" aria-label="起動コマンドをコピー" hidden>コピー <span aria-hidden="true">⧉</span></button></div><pre tabindex="0" aria-label="起動コマンド"><code id="start-code">bun run cli check-config
 bun run dev</code></pre></div>
             </li>
@@ -118,10 +173,10 @@ bun run dev</code></pre></div>
       </section>
 
       <section class="docs-section wrap section-space" id="docs" aria-labelledby="docs-title">
-        <div class="docs-intro"><p class="eyebrow">A LITTLE FURTHER</p><h2 id="docs-title">次の一歩も、<br>迷わずに。</h2><p>自分の環境で動かすところから、<br>Dexとの接続、日々の運用まで。</p></div>
+        <div class="docs-intro"><p class="eyebrow">A LITTLE FURTHER</p><h2 id="docs-title">次の一歩も、<br>迷わずに。</h2><p>自分の環境で動かすところから、<br>直接接続と共有Dex、日々の運用まで。</p></div>
         <div class="resource-list">
-          <a class="resource" href="https://github.com/glyzinie/Kitune/blob/main/guides/deployment.md"><span class="resource-index">01</span><div><h3>KituneとDexを配置する</h3><p>ドメイン、Flyの構成、起動までの手順。</p></div><span class="resource-arrow" aria-hidden="true">↗</span></a>
-          <a class="resource" href="https://github.com/glyzinie/Kitune/blob/main/guides/federation.md"><span class="resource-index">02</span><div><h3>認証のつながりを設計する</h3><p>個人・家族・サークルのDexと役割分担。</p></div><span class="resource-arrow" aria-hidden="true">↗</span></a>
+          <a class="resource" href="https://github.com/glyzinie/Kitune/blob/main/guides/deployment.md"><span class="resource-index">01</span><div><h3>Kituneを配置する</h3><p>ドメイン、Flyの構成、起動までの手順。</p></div><span class="resource-arrow" aria-hidden="true">↗</span></a>
+          <a class="resource" href="https://github.com/glyzinie/Kitune/blob/main/guides/federation.md"><span class="resource-index">02</span><div><h3>サービスへ直接接続する</h3><p>Headscale・Gitea・Tailscaleと共有Dexの役割分担。</p></div><span class="resource-arrow" aria-hidden="true">↗</span></a>
           <a class="resource" href="https://github.com/glyzinie/Kitune/blob/main/guides/operations.md"><span class="resource-index">03</span><div><h3>日々の管理とバックアップ</h3><p>設定変更、秘密値、失効、復元の手順。</p></div><span class="resource-arrow" aria-hidden="true">↗</span></a>
         </div>
       </section>

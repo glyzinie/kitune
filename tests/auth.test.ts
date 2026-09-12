@@ -34,6 +34,7 @@ describe("configuration and boundaries", () => {
     expect(() => fixtureConfig({ origin: "http://127.0.0.1:3000" })).toThrow();
     expect(() => fixtureConfig({ origin: "https://127.0.0.1" })).toThrow();
     expect(() => fixtureConfig({ clients: [{ ...config.clients[0], redirect_uris: ["https://example.com/*"] }] })).toThrow();
+    expect(() => fixtureConfig({ clients: [{ ...config.clients[0], require_pkce: "false" }] })).toThrow();
   });
   test.each(["public", "secret_env", "missing secret", "short secret"] as const)("invalid %s client configuration fails before database creation", async (invalid) => {
     const directory = await mkdtemp(join(tmpdir(), "kitune-config-test-")); tempPaths.push(directory);
@@ -217,8 +218,16 @@ describe("Discord identity mapping", () => {
 });
 
 describe("OIDC and revocation", () => {
-  async function brokers() {
+  // Build these requests without the PKCE/nonce defaults of authorize().
+  async function withoutPKCE(agent: Agent, additional: Record<string, string> = {}) {
+    const params = new URLSearchParams({ client_id: "test-client", redirect_uri: "http://localhost:9000/callback", response_type: "code", scope: "openid profile email", state: "test-state", ...additional });
+    const response = await agent.get(`/api/auth/oauth2/authorize?${params}`);
+    const location = new URL(response.headers.get("location") ?? "/", agent.origin);
+    return { response, location };
+  }
+  async function brokers(requirePKCE?: boolean) {
     const settings = fixtureSettings();
+    if (requirePKCE !== undefined) settings.config.clients[0]!.require_pkce = requirePKCE;
     const first = { id: "test-client", secret: clientSecret };
     const second = { id: "second-broker", secret: "second-broker-secret-for-isolation-test" };
     settings.config.clients.push({ ...settings.config.clients[0]!, id: second.id, name: "Second broker", secret_env: "SECOND_BROKER_SECRET" });
@@ -227,7 +236,13 @@ describe("OIDC and revocation", () => {
     const app = createApp(runtime);
     const agent = new Agent((request) => app.fetch(request), settings.config.origin);
     await enroll(runtime, agent);
-    const codeFor = async (id: string) => {
+    const codeFor = async (id: string): Promise<Record<string, string>> => {
+      if (requirePKCE === false) {
+        const flow = await withoutPKCE(agent, { client_id: id, scope: "openid profile email offline_access", nonce: "test-nonce" });
+        const code = flow.location.searchParams.get("code");
+        expect(code).toBeTruthy();
+        return { grant_type: "authorization_code", code: code!, redirect_uri: "http://localhost:9000/callback" };
+      }
       const flow = await authorize(agent, { client_id: id });
       return { grant_type: "authorization_code", code: new URL(flow.location).searchParams.get("code")!, code_verifier: flow.verifier, redirect_uri: "http://localhost:9000/callback" };
     };
@@ -268,6 +283,7 @@ describe("OIDC and revocation", () => {
     }
     const missing = await authorize(agent, { code_challenge: "", code_challenge_method: "" });
     expect(new URL(missing.location, agent.origin).searchParams.has("code")).toBe(false);
+    expect((await withoutPKCE(agent)).location.searchParams.has("code")).toBe(false);
     const plain = await authorize(agent, { code_challenge_method: "plain" });
     expect(new URL(plain.location, agent.origin).searchParams.has("code")).toBe(false);
     const wrong = await authorize(agent);
@@ -306,8 +322,85 @@ describe("OIDC and revocation", () => {
     expect(rotated.status).toBe(200);
     expect(decodeJwt((await rotated.json()).id_token).sub).toBe("owner");
   });
-  test("brokers cannot exchange each other's codes or refresh tokens", async () => {
-    const { agent, first, second, codeFor } = await brokers();
+  test.each(["client_secret_basic", "client_secret_post"] as const)("Gitea-shaped requests without nonce or PKCE require a valid %s secret and support UserInfo", async (method) => {
+    const config = fixtureConfig();
+    Object.assign(config.clients[0]!, { require_pkce: false, token_endpoint_auth_method: method });
+    const { runtime, agent } = await setup(config);
+    await enroll(runtime, agent);
+    const codeFor = async () => {
+      const flow = await withoutPKCE(agent);
+      expect(flow.location.searchParams.get("state")).toBe("test-state");
+      const code = flow.location.searchParams.get("code");
+      expect(code).toBeTruthy();
+      return { grant_type: "authorization_code", code: code!, redirect_uri: "http://localhost:9000/callback" };
+    };
+    const missing = await agent.request("/api/auth/oauth2/token", {
+      method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ ...await codeFor(), client_id: "test-client" }),
+    });
+    expect(missing.status).toBeGreaterThanOrEqual(400);
+    expect((await token(agent, await codeFor(), { id: "test-client", secret: "incorrect-secret", method })).status).toBeGreaterThanOrEqual(400);
+    const body = await codeFor();
+    const client = { id: "test-client", secret: clientSecret, method };
+    const exchanged = await token(agent, body, client);
+    expect(exchanged.status).toBe(200);
+    const tokens = await exchanged.json();
+    expect(tokens.refresh_token).toBeUndefined();
+    const jwks = await (await agent.get("/api/auth/jwks")).json();
+    const { payload } = await jwtVerify(tokens.id_token, createLocalJWKSet(jwks), { issuer: `${agent.origin}/api/auth`, audience: client.id });
+    expect(payload.sub).toBe("owner");
+    expect(payload.nonce).toBeUndefined();
+    expect(payload.groups).toBeUndefined();
+    const info = await agent.request("/api/auth/oauth2/userinfo", { headers: { authorization: `Bearer ${tokens.access_token}` } });
+    expect(info.status).toBe(200);
+    expect(await info.json()).toMatchObject({ sub: payload.sub, name: "Owner", email: "owner@example.com", email_verified: true, preferred_username: "owner" });
+    expect((await token(agent, body, client)).status).toBeGreaterThanOrEqual(400);
+  });
+  test("optional PKCE still validates supplied S256 challenges and rejects plain", async () => {
+    const config = fixtureConfig(); config.clients[0]!.require_pkce = false;
+    const { runtime, agent } = await setup(config);
+    await enroll(runtime, agent);
+    const plain = await authorize(agent, { code_challenge_method: "plain" });
+    expect(new URL(plain.location, agent.origin).searchParams.has("code")).toBe(false);
+    for (const verifier of [undefined, "x".repeat(43)]) {
+      const flow = await authorize(agent);
+      const body: Record<string, string> = { grant_type: "authorization_code", code: new URL(flow.location).searchParams.get("code")!, redirect_uri: "http://localhost:9000/callback" };
+      if (verifier !== undefined) body.code_verifier = verifier;
+      expect((await token(agent, body)).status).toBeGreaterThanOrEqual(400);
+    }
+    const unchallenged = await withoutPKCE(agent);
+    expect((await token(agent, { grant_type: "authorization_code", code: unchallenged.location.searchParams.get("code")!, code_verifier: "x".repeat(43), redirect_uri: "http://localhost:9000/callback" })).status).toBeGreaterThanOrEqual(400);
+    const flow = await authorize(agent);
+    const body = { grant_type: "authorization_code", code: new URL(flow.location).searchParams.get("code")!, code_verifier: flow.verifier, redirect_uri: "http://localhost:9000/callback" };
+    expect((await token(agent, body)).status).toBe(200);
+    expect((await token(agent, body)).status).toBeGreaterThanOrEqual(400);
+  });
+  test("offline_access without PKCE requires openid and a nonempty nonce", async () => {
+    const config = fixtureConfig(); config.clients[0]!.require_pkce = false;
+    const { runtime, agent } = await setup(config);
+    await enroll(runtime, agent);
+    for (const request of [
+      { scope: "openid profile offline_access" },
+      { scope: "openid profile offline_access", nonce: "" },
+      { scope: "profile offline_access", nonce: "test-nonce" },
+    ]) {
+      const flow = await withoutPKCE(agent, request as Record<string, string>);
+      expect(flow.location.searchParams.has("code")).toBe(false);
+    }
+    const flow = await withoutPKCE(agent, { scope: "openid profile offline_access", nonce: "refresh-nonce" });
+    const exchanged = await token(agent, { grant_type: "authorization_code", code: flow.location.searchParams.get("code")!, redirect_uri: "http://localhost:9000/callback" });
+    expect(exchanged.status).toBe(200);
+    const tokens = await exchanged.json();
+    expect(decodeJwt(tokens.id_token).nonce).toBe("refresh-nonce");
+    expect(tokens.refresh_token).toBeString();
+    expect((await token(agent, { grant_type: "refresh_token", refresh_token: tokens.refresh_token })).status).toBe(200);
+    const pkce = await authorize(agent, { nonce: "" });
+    const withPKCE = await token(agent, { grant_type: "authorization_code", code: new URL(pkce.location).searchParams.get("code")!, code_verifier: pkce.verifier, redirect_uri: "http://localhost:9000/callback" });
+    expect(withPKCE.status).toBe(200);
+    expect((await withPKCE.json()).refresh_token).toBeString();
+  });
+  test.each([true, false])("clients cannot exchange each other's codes or refresh tokens with require_pkce=%s", async (required) => {
+    const { agent, first, second, codeFor } = await brokers(required);
     for (const [owner, other] of [[first, second], [second, first]] as const) {
       expect((await token(agent, await codeFor(owner.id), other)).status).toBeGreaterThanOrEqual(400);
       const exchanged = await token(agent, await codeFor(owner.id), owner);
@@ -335,6 +428,62 @@ describe("OIDC and revocation", () => {
     expect((await token(agent, { grant_type: "refresh_token", refresh_token: secondTokens.refresh_token }, second)).status).toBe(200);
     expect((await token(agent, await codeFor(first.id), rotated)).status).toBe(200);
     expect((await (await agent.get("/api/auth/get-session")).json()).user.id).toBe("owner");
+  });
+  test.each([false, true, undefined])("changing require_pkce to %s revokes only the affected client's codes and grants", async (next) => {
+    const { settings, runtime, agent, first, second, codeFor } = await brokers(next === false ? true : false);
+    const issue = async (client: typeof first) => {
+      const exchanged = await token(agent, await codeFor(client.id), client);
+      expect(exchanged.status).toBe(200);
+      return exchanged.json();
+    };
+    const firstTokens = await issue(first), secondTokens = await issue(second);
+    const firstCode = await codeFor(first.id), secondCode = await codeFor(second.id);
+    if (next === undefined) delete settings.config.clients[0]!.require_pkce;
+    else settings.config.clients[0]!.require_pkce = next;
+    runtime.store.reconcile(settings);
+    expect((await token(agent, firstCode, first)).status).toBeGreaterThanOrEqual(400);
+    expect((await token(agent, { grant_type: "refresh_token", refresh_token: firstTokens.refresh_token }, first)).status).toBeGreaterThanOrEqual(400);
+    expect((await agent.request("/api/auth/oauth2/userinfo", { headers: { authorization: `Bearer ${firstTokens.access_token}` } })).status).toBe(401);
+    expect((await agent.request("/api/auth/oauth2/userinfo", { headers: { authorization: `Bearer ${secondTokens.access_token}` } })).status).toBe(200);
+    expect((await token(agent, secondCode, second)).status).toBe(200);
+    expect((await token(agent, { grant_type: "refresh_token", refresh_token: secondTokens.refresh_token }, second)).status).toBe(200);
+    const fresh = await withoutPKCE(agent);
+    expect(fresh.location.searchParams.has("code")).toBe(next === false);
+    if (next === false) expect((await token(agent, { grant_type: "authorization_code", code: fresh.location.searchParams.get("code")!, redirect_uri: "http://localhost:9000/callback" })).status).toBe(200);
+    else expect(decodeJwt((await grant(agent)).id_token).sub).toBe("owner");
+    expect((await (await agent.get("/api/auth/get-session")).json()).user.id).toBe("owner");
+  });
+  test("legacy settings without require_pkce preserve grants, credentials and signing keys across restart", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "kitune-legacy-client-")); tempPaths.push(directory);
+    const databasePath = join(directory, "kitune.sqlite");
+    const { runtime, agent } = await setup({}, databasePath);
+    const key = await enroll(runtime, agent);
+    const tokens = await grant(agent);
+    const pending = await authorize(agent);
+    const jwks = await (await agent.get("/api/auth/jwks")).json();
+    const credentials = runtime.store.db.query("SELECT id, credentialID, userId FROM passkey").all();
+    // Fingerprint of the fixture client produced before require_pkce existed.
+    const legacyFingerprint = "jxuayG41ubqq71i86fCpSmwES5R05n1f1FdhaKDYxUo";
+    const fingerprint = () => runtime.store.db.query<{ fingerprint: string }, []>("SELECT fingerprint FROM kituneClient WHERE id='test-client'").get()!.fingerprint;
+    expect(fingerprint()).toBe(legacyFingerprint);
+    expect(runtime.settings.config.clients[0]).not.toHaveProperty("require_pkce");
+    runtime.close();
+    const restored = await setup({}, databasePath);
+    for (const [name, value] of agent.cookies) restored.agent.cookies.set(name, value);
+    expect(restored.runtime.store.db.query("PRAGMA user_version").get()).toEqual({ user_version: 1 });
+    expect(restored.runtime.store.db.query("SELECT fingerprint FROM kituneClient WHERE id='test-client'").get()).toEqual({ fingerprint: legacyFingerprint });
+    expect(await (await restored.agent.get("/api/auth/jwks")).json()).toEqual(jwks);
+    expect(restored.runtime.store.db.query("SELECT id, credentialID, userId FROM passkey").all()).toEqual(credentials);
+    expect((await (await restored.agent.get("/api/auth/get-session")).json()).user.id).toBe("owner");
+    expect((await restored.agent.request("/api/auth/oauth2/userinfo", { headers: { authorization: `Bearer ${tokens.access_token}` } })).status).toBe(200);
+    expect((await token(restored.agent, { grant_type: "authorization_code", code: new URL(pending.location).searchParams.get("code")!, code_verifier: pending.verifier, redirect_uri: "http://localhost:9000/callback" })).status).toBe(200);
+    const refreshed = await token(restored.agent, { grant_type: "refresh_token", refresh_token: tokens.refresh_token });
+    expect(refreshed.status).toBe(200);
+    expect(decodeJwt((await refreshed.json()).id_token).sub).toBe("owner");
+    restored.agent.cookies.clear();
+    const options = await (await restored.agent.get("/api/auth/passkey/generate-authenticate-options")).json();
+    expect(options.rpId).toBe("localhost");
+    expect((await restored.agent.post("/api/auth/passkey/verify-authentication", { response: key.assertion(options, restored.agent.origin) })).status).toBe(200);
   });
   test("removing a session invalidates its pending code and OAuth grants", async () => {
     const { runtime, agent, app } = await setup();

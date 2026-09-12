@@ -2,6 +2,7 @@ import { strict as assert } from "node:assert";
 import { createHash, randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createLocalJWKSet, jwtVerify } from "jose";
+import { type CredentialMutations, withCredentialCleanup } from "./credential-cleanup";
 import { Agent, Authenticator } from "./helpers";
 
 // This is an explicit live test, never part of `bun test`.
@@ -76,9 +77,7 @@ const kituneToken = (body: Record<string, string>) => kitune.request("/api/auth/
   body: new URLSearchParams(body),
 });
 
-let enrolled = false;
-let failure: unknown;
-try {
+async function exercise(mutations: CredentialMutations) {
   const kituneDiscovery = await json(`${settings.kituneOrigin}/api/auth/.well-known/openid-configuration`);
   assert.equal(kituneDiscovery.issuer, `${settings.kituneOrigin}/api/auth`);
   assert.equal((await kitune.get("/login")).status, 200);
@@ -86,18 +85,17 @@ try {
   const kituneKeys = await json(kituneDiscovery.jwks_uri);
   console.log("Live TLS, Discovery, JWKS and UI assets passed");
 
-  const output = await cli("enroll", settings.smokeUser);
+  const output = await mutations.issueEnrollment(() => cli("enroll", settings.smokeUser));
   const enrollment = new URL(output.split(/\s+/).find(value => value.startsWith(`${settings.kituneOrigin}/enroll#`))!);
   assert.equal((await kitune.post("/enrollment", { token: enrollment.hash.slice(1) })).status, 200);
   assert.equal(await (await kitune.get("/api/auth/get-session")).json(), null);
   const options = await (await kitune.get("/api/auth/passkey/generate-register-options")).json();
   const key = new Authenticator("bada5566-a7aa-401f-bd96-45619a55120d");
-  const withoutUV = await kitune.post("/api/auth/passkey/verify-registration", { response: key.registration(options, settings.kituneOrigin, false), createSession: true });
+  const withoutUV = await mutations.registerPasskey(() => kitune.post("/api/auth/passkey/verify-registration", { response: key.registration(options, settings.kituneOrigin, false), createSession: true }));
   assert(withoutUV.status >= 400, "Registration without UV must fail");
   const retryOptions = await (await kitune.get("/api/auth/passkey/generate-register-options")).json();
-  const registration = await kitune.post("/api/auth/passkey/verify-registration", { response: key.registration(retryOptions, settings.kituneOrigin), createSession: true });
+  const registration = await mutations.registerPasskey(() => kitune.post("/api/auth/passkey/verify-registration", { response: key.registration(retryOptions, settings.kituneOrigin), createSession: true }));
   assert.equal(registration.status, 200, "Live Passkey registration");
-  enrolled = true;
   await kitune.post("/api/auth/sign-out", {});
   const loginOptions = await (await kitune.get("/api/auth/passkey/generate-authenticate-options")).json();
   assert.equal((await kitune.post("/api/auth/passkey/verify-authentication", { response: key.assertion(loginOptions, settings.kituneOrigin) })).status, 200);
@@ -176,28 +174,29 @@ try {
   assert((await kitune.request("/api/auth/oauth2/userinfo", { headers: { authorization: `Bearer ${tokens.access_token}` } })).status >= 400, "Revoked access token could still reach UserInfo");
   report.passed = true;
   console.log("Live revocation invalidated the direct Kitune session, refresh token and access token");
-} catch (error) {
-  report.passed = false;
-  failure = error;
-  throw error;
-} finally {
-  try {
-    if (enrolled) {
+}
+
+try {
+  await withCredentialCleanup(exercise, {
+    prepare: async () => {
       // A failed wake-up may leave the Machine suspended and unable to accept SSH.
       const machines = JSON.parse(await fly("machine", "list", "-a", settings.kituneApp, "--json"));
       if (machines.find((m: { id: string }) => m.id === kituneMachine)?.state !== "started") {
         await fly("machine", "start", kituneMachine, "-a", settings.kituneApp);
       }
       await json(`${settings.kituneOrigin}/healthz`);
-      await cli("recover", settings.smokeUser); // Remove the test key and grants; discard the replacement URL.
-    }
-  } catch (cleanupError) {
+    },
+    recover: async () => { await cli("recover", settings.smokeUser); },
+    revoke: async () => { await cli("revoke", settings.smokeUser); },
+  }, () => {
     report.cleanupFailed = true;
     report.passed = false;
-    if (!failure) throw cleanupError;
     console.error("Test credential cleanup failed; restore the canonical configuration before using the service");
-  } finally {
-    await mkdir("test-results", { recursive: true });
-    await writeFile(`test-results/fly-${lifecycle}.json`, JSON.stringify(report, null, 2), { mode: 0o600 });
-  }
+  });
+} catch (error) {
+  report.passed = false;
+  throw error;
+} finally {
+  await mkdir("test-results", { recursive: true });
+  await writeFile(`test-results/fly-${lifecycle}.json`, JSON.stringify(report, null, 2), { mode: 0o600 });
 }

@@ -52,6 +52,7 @@ export const configSchema = z.strictObject({
   origin,
   name: z.string().trim().min(1).max(100).default("Kitune"),
   theme: z.enum(themeNames).optional(),
+  trusted_ip_source: z.enum(["fly", "reverse_proxy", "localhost"]).default("fly"),
   users: z.array(userSchema).min(1),
   clients: z.array(clientSchema).default([]),
 }).superRefine((config, ctx) => {
@@ -64,6 +65,9 @@ export const configSchema = z.strictObject({
   unique(config.clients.map((c) => c.id), "clients");
   for (const u of config.users) unique(u.groups, "users");
   for (const c of config.clients) { unique(c.redirect_uris, "clients"); unique(c.scopes, "clients"); }
+  if (config.trusted_ip_source === "localhost" && new URL(config.origin).hostname !== "localhost") {
+    ctx.addIssue({ code: "custom", path: ["trusted_ip_source"], message: "localhost is only allowed with a localhost origin" });
+  }
 });
 
 export type Config = z.infer<typeof configSchema>;

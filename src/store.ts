@@ -107,6 +107,16 @@ export class Store {
           this.db.query("DELETE FROM account WHERE id = ?").run(account.id);
         }
       }
+      // Vacate changed emails before the per-user UPSERTs so swaps and
+      // reassignments do not depend on configuration order. The temporary
+      // values cannot be configured emails and are unique by managed user ID.
+      for (const user of config.users) {
+        const old = previousUsers.find((entry) => entry.id === user.id);
+        if (old && !old.retired) {
+          this.db.query("UPDATE user SET email = ? WHERE id = ? AND email <> ?")
+            .run(`kitune-reconcile:${user.id}`, user.id, user.email);
+        }
+      }
       const now = new Date().toISOString();
       for (const user of config.users) {
         const old = previousUsers.find((entry) => entry.id === user.id);

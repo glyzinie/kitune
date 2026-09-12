@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { randomBytes } from "node:crypto";
-import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLocalJWKSet, jwtVerify } from "jose";
@@ -69,7 +69,7 @@ try {
     if (process.env.DOCKER_TEST_BUILDX) await command(process.env.DOCKER_TEST_BUILDX, [...buildArgs, "--load", "."]);
     else await docker([...buildArgs, "."]);
   }
-  const config = fixtureConfig({ origin, users: [{ id: "owner", name: "Owner", email: "owner@example.com", groups: ["personal"] }] });
+  const config = fixtureConfig({ origin, trusted_ip_source: "fly", users: [{ id: "owner", name: "Owner", email: "owner@example.com", groups: ["personal"] }] });
   await writeFile(join(directory, "config.toml"), Bun.TOML.stringify(config)!, { mode: 0o600 });
   await writeFile(join(directory, "env"), `BETTER_AUTH_SECRET=${randomBytes(32).toString("hex")}\nTEST_CLIENT_SECRET=${clientSecret}\n`, { mode: 0o600 });
   const container = await createContainer("source");
@@ -86,11 +86,11 @@ try {
   assert.equal(permissions.databaseMode, 0o600);
   assert.equal(permissions.configMode, 0o640);
 
-  // The Bun test runner needs no dev dependencies for these API tests.
-  await mkdir(join(directory, "tests"));
-  for (const file of ["auth.test.ts", "helpers.ts"]) await cp(new URL(file, import.meta.url), join(directory, "tests", file));
+  // Include every regression file; Bun discovers only *.test.ts, not the
+  // explicit *.integration.ts scripts. These tests need no dev dependencies.
+  await cp(new URL(".", import.meta.url), join(directory, "tests"), { recursive: true });
   await docker(["cp", join(directory, "tests"), `${container}:/app/tests`]);
-  await docker(["exec", container, "gosu", "bun", "bun", "test", "tests/auth.test.ts"]);
+  await docker(["exec", container, "gosu", "bun", "bun", "test", "tests"]);
   console.log("Container API test suite passed");
 
   const enrollment = new URL(await cli(container, "enroll", "owner"));

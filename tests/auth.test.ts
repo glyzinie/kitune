@@ -483,7 +483,7 @@ describe("OIDC and revocation", () => {
     runtime.close();
     const restored = await setup({}, databasePath);
     for (const [name, value] of agent.cookies) restored.agent.cookies.set(name, value);
-    expect(restored.runtime.store.db.query("PRAGMA user_version").get()).toEqual({ user_version: 1 });
+    expect(restored.runtime.store.db.query("PRAGMA user_version").get()).toEqual({ user_version: 2 });
     expect(restored.runtime.store.db.query("SELECT fingerprint FROM kituneClient WHERE id='test-client'").get()).toEqual({ fingerprint: legacyFingerprint });
     expect(await (await restored.agent.get("/api/auth/jwks")).json()).toEqual(jwks);
     expect(restored.runtime.store.db.query("SELECT id, credentialID, userId FROM passkey").all()).toEqual(credentials);

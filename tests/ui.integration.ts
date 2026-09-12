@@ -23,8 +23,12 @@ try {
   page.setDefaultTimeout(15_000);
   const errors: string[] = [];
   const urls: string[] = [];
+  let consentBody: unknown;
   page.on("pageerror", (error) => errors.push(error.message));
-  page.on("request", (request) => urls.push(request.url()));
+  page.on("request", (request) => {
+    urls.push(request.url());
+    if (new URL(request.url()).pathname === "/api/auth/oauth2/consent" && request.method() === "POST") consentBody = request.postDataJSON();
+  });
   const cdp = await context.newCDPSession(page);
   await cdp.send("WebAuthn.enable");
   await cdp.send("WebAuthn.addVirtualAuthenticator", { options: { protocol: "ctap2", ctap2Version: "ctap2_1", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
@@ -49,18 +53,28 @@ try {
   await page.waitForURL(`${origin}/login`);
   await page.screenshot({ path: "test-results/login-desktop.png", fullPage: true });
   const verifier = randomBytes(32).toString("base64url");
-  const query = new URLSearchParams({ client_id: "test-client", redirect_uri: callbackURL, response_type: "code", scope: "openid profile email groups offline_access", state: "browser-state", nonce: "browser-nonce", code_challenge_method: "S256", code_challenge: createHash("sha256").update(verifier).digest("base64url") });
+  const query = new URLSearchParams({ client_id: "test-client", redirect_uri: callbackURL, response_type: "code", scope: "openid", claims: JSON.stringify({ userinfo: { email: { essential: true } } }), state: "browser-state", nonce: "browser-nonce", code_challenge_method: "S256", code_challenge: createHash("sha256").update(verifier).digest("base64url") });
   await page.goto(`${origin}/api/auth/oauth2/authorize?${query}`);
   await page.getByRole("button", { name: "Passkeyでログイン" }).click();
   await page.waitForURL(`${origin}/consent?**`);
   await page.getByRole("heading", { name: "テストサービスに接続" }).waitFor();
+  assert.equal(await page.getByText("あなたを識別するID", { exact: true }).count(), 1);
+  assert.equal(await page.getByText("メールアドレス", { exact: true }).count(), 1);
+  assert.equal(await page.getByText("名前・ユーザー名", { exact: true }).count(), 0);
   await page.screenshot({ path: "test-results/consent-desktop.png", fullPage: true });
   await page.getByRole("button", { name: "許可して続ける" }).click();
   await page.waitForURL(`${callbackURL}?**`);
+  assert.equal((consentBody as { accept?: unknown }).accept, true);
+  assert.equal((consentBody as { scope?: unknown }).scope, "openid");
+  assert.deepEqual((consentBody as { claims?: unknown }).claims, { userinfo: { email: null } });
   const callback = new URL(page.url());
   assert.equal(callback.searchParams.get("state"), "browser-state");
   const tokenResponse = await fetch(`${origin}/api/auth/oauth2/token`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", authorization: `Basic ${Buffer.from(`test-client:${clientSecret}`).toString("base64")}` }, body: new URLSearchParams({ grant_type: "authorization_code", code: callback.searchParams.get("code")!, code_verifier: verifier, redirect_uri: callbackURL }) });
   assert.equal(tokenResponse.status, 200, "Browser OIDC code exchange failed");
+  const tokens = await tokenResponse.json() as { access_token: string };
+  const userInfoResponse = await fetch(`${origin}/api/auth/oauth2/userinfo`, { headers: { authorization: `Bearer ${tokens.access_token}` } });
+  assert.equal(userInfoResponse.status, 200, "Browser OIDC UserInfo failed");
+  assert.deepEqual(await userInfoResponse.json(), { sub: "owner", email: "owner@example.com" });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${origin}/account`);
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "Account screen overflows on mobile");
@@ -69,7 +83,7 @@ try {
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "Login screen overflows on mobile");
   await page.screenshot({ path: "test-results/login-mobile.png", fullPage: true });
   assert.deepEqual(errors, [], "Browser JavaScript errors");
-  console.log("Browser integration passed: registration, login, key management, OIDC consent/code exchange, mobile layout and token privacy");
+  console.log("Browser integration passed: registration, login, key management, OIDC claims consent/code exchange, mobile layout and token privacy");
 } catch (error) {
   if (page && !page.isClosed()) {
     console.error("UI failure:", new URL(page.url()).pathname, await page.locator("#status").textContent().catch(() => ""));

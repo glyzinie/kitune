@@ -4,9 +4,13 @@ import { createApp } from "./app";
 
 process.umask(0o077);
 const settings = await loadSettings();
+const hostname = process.env.HOST ?? (settings.config.trusted_ip_source === "localhost" ? "127.0.0.1" : "0.0.0.0");
+if (settings.config.trusted_ip_source === "localhost" && !["127.0.0.1", "::1", "localhost"].includes(hostname)) {
+  throw new Error("localhost IP mode requires a loopback HOST");
+}
 const runtime = await createRuntime(settings);
 const app = createApp(runtime);
-const server = Bun.serve({ hostname: process.env.HOST ?? "0.0.0.0", port: Number(process.env.PORT ?? 3000), fetch: app.fetch });
+const server = Bun.serve({ hostname, port: Number(process.env.PORT ?? 3000), fetch: app.fetch });
 console.log(`Kitune listening on port ${server.port}`);
 let stopping = false;
 async function shutdown() {

@@ -3,6 +3,9 @@ origin = "http://localhost:3000"
 name = "Kitune"
 # 配色のプリセット: lavender / blue / sage / amber。未指定時は amber。
 theme = "amber"
+# この例はホストから直接アクセスするローカル開発用です。
+# Flyでは省略するか "fly"、ホストのCaddy/Nginxでは "reverse_proxy" にします。
+trusted_ip_source = "localhost"
 
 [[users]]
 id = "owner"

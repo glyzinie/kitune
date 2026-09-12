@@ -2,7 +2,7 @@
 
 PasskeyとDiscordだけでログインする、個人用OIDC認証元。Better Auth 1.7.4・Hono 4.13.7・Bun 1.4.2・SQLiteで動作します。
 
-secretを保持できるWebサービスは、自分のKitune（`id.example.com`）へ直接接続します。家族・サークルで複数の認証元を1つにまとめる場合だけ、共有Dexを任意で挟めます。[構成と役割分担](guides/federation.md)と[Fly配置手順](guides/deployment.md)を参照してください。
+secretを保持できるWebサービスは、自分のKitune（`id.example.com`）へ直接接続します。家族・サークルで複数の認証元を1つにまとめる場合だけ、共有Dexを任意で挟めます。[構成と役割分担](guides/federation.md)、[Fly配置手順](guides/deployment.md)、[ホストのリバースプロキシからのDocker配置](guides/reverse-proxy.md)を参照してください。
 
 ## はじめる
 
@@ -15,6 +15,8 @@ bun install --frozen-lockfile
 `config.toml` のユーザー・クライアントと、`.env` の秘密値を設定します。`BETTER_AUTH_SECRET` と各クライアントsecretには、`openssl rand -hex 32` などで個別に生成した値を使ってください。Bunが `.env` を読み込みます。
 
 ローカルでは `http://localhost:3000` を開きます。PasskeyのRP IDにはIPアドレスを使えないため、`127.0.0.1` はIdPのoriginに指定できません。本番はHTTPSのドメインを使います。
+
+`trusted_ip_source` は接続元IPを信頼する経路です。ローカル開発は `localhost`、Flyは `fly`（省略時の既定）、ホストのCaddy/Nginxは `reverse_proxy` を指定します。Kituneは選択した経路以外のヘッダーへ切り替えません。
 
 ```sh
 bun run cli check-config
@@ -88,6 +90,8 @@ GitHub ActionsはAMD64・ARM64それぞれのネイティブランナーでビ�
 公開処理にはリポジトリの `GITHUB_TOKEN` を使い、Flyの秘密値は不要です。初回発行後、GitHub Packagesのパッケージ設定でVisibilityがPublicになっていることを確認してください。Flyへのデプロイはこのworkflowから実行しません。
 
 コンテナには `BETTER_AUTH_SECRET` とクライアント秘密値を環境変数で渡し、設定を `/app/config.toml`、永続Volumeを `/data` に配置します。実ユーザー設定・秘密値・DB・バックアップはイメージに含めません。
+
+ホストのCaddy/Nginxから接続する場合は、コンテナの公開ポートを `127.0.0.1` に限定し、プロキシが単一の `X-Forwarded-For` を上書きする必要があります。具体例は[リバースプロキシ配置](guides/reverse-proxy.md)にあります。
 
 ## 紹介サイト
 

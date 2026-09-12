@@ -73,8 +73,12 @@ document.addEventListener("click", async (event) => {
         const result = await local(`/account/sessions/${encodeURIComponent(button.dataset.id!)}/delete`);
         location.assign(result.current ? "/login" : "/account"); break;
       }
-      case "consent-accept": case "consent-deny":
-        finish(await api("/oauth2/consent", { accept: button.dataset.action === "consent-accept" })); break;
+      case "consent-accept": {
+        if (button.dataset.consentScope === undefined || button.dataset.consentClaims === undefined) throw new Error("認証リクエストが無効です。サービスからやり直してください。");
+        finish(await api("/oauth2/consent", { accept: true, scope: button.dataset.consentScope, claims: JSON.parse(button.dataset.consentClaims) })); break;
+      }
+      case "consent-deny":
+        finish(await api("/oauth2/consent", { accept: false })); break;
     }
   } catch (error) {
     status.textContent = error instanceof Error && error.name === "NotAllowedError"

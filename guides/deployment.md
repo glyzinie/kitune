@@ -25,7 +25,7 @@ chmod 600 deploy/local/kitune/*
 `BETTER_AUTH_SECRET`、必要なDiscord秘密値、各OIDCクライアントのsecretをFly Secretsへ個別に保存します。設定全体はbase64にして `IDP_CONFIG` に保存します。以下はリポジトリルートで実行します。
 
 ```sh
-bun run cli check-config
+CONFIG_PATH=deploy/local/kitune/config.toml bun run cli check-config
 bun -e 'console.log("IDP_CONFIG=" + Buffer.from(await Bun.file("deploy/local/kitune/config.toml").text()).toString("base64"))' | fly secrets import --stage -c deploy/local/kitune/fly.toml
 fly config validate -c deploy/local/kitune/fly.toml
 fly deploy . -c deploy/local/kitune/fly.toml --remote-only --ha=false --strategy immediate

@@ -8,6 +8,7 @@ export const clientSecret = "2a08012b01e3bb729b70d1c1973b0db1f40f7c9f581494f2983
 export function fixtureConfig(overrides: Record<string, unknown> = {}) {
   return configSchema.parse({
     origin: "http://localhost:3000",
+    trusted_ip_source: "localhost",
     users: [
       { id: "owner", name: "Owner", email: "owner@example.com", email_verified: true, discord_ids: ["111111111111111111", "222222222222222222"], groups: ["personal", "reader"] },
       { id: "alternate", name: "Alternate", email: "alt@example.com", discord_ids: ["333333333333333333"], groups: [] },

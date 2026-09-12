@@ -5,7 +5,9 @@ import { setCookie } from "hono/cookie";
 import { APIError } from "better-auth/api";
 import type { Child } from "hono/jsx";
 import { assertFresh, ENROLLMENT_COOKIE, type Runtime } from "./auth";
+import { consentDetails } from "./consent";
 import { themeStyles } from "./theme";
+import { clientIP, clientIPRequest } from "./client-ip";
 
 const publicAssetTypes = new Map([
   ["client.js", "text/javascript; charset=utf-8"],
@@ -60,8 +62,11 @@ export function createApp(runtime: Runtime) {
       "Cache-Control": "no-store",
     } });
   });
-  app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
-  app.get("/.well-known/oauth-authorization-server/api/auth", (c) => auth.handler(c.req.raw));
+  app.all("/api/auth/*", (c) => {
+    if (!clientIP(c.req.raw, config)) throw new APIError("BAD_REQUEST", { message: "接続元IPを確認できません。プロキシ設定を確認してください。" });
+    return auth.handler(clientIPRequest(c.req.raw, config));
+  });
+  app.get("/.well-known/oauth-authorization-server/api/auth", (c) => auth.handler(clientIPRequest(c.req.raw, config)));
 
   const sessionFor = async (request: Request, fresh = false) => {
     const session = await auth.api.getSession({ headers: request.headers });
@@ -93,7 +98,8 @@ export function createApp(runtime: Runtime) {
   const enrollmentAttempts = new Map<string, { count: number; until: number }>();
   app.post("/enrollment", async (c) => {
     if (c.req.header("origin") !== config.origin) throw new APIError("FORBIDDEN");
-    const ip = c.req.header("fly-client-ip") ?? "local";
+    const ip = clientIP(c.req.raw, config);
+    if (!ip) throw new APIError("BAD_REQUEST", { message: "接続元IPを確認できません。プロキシ設定を確認してください。" });
     const now = Date.now();
     for (const [key, value] of enrollmentAttempts) if (value.until <= now) enrollmentAttempts.delete(key);
     const attempt = enrollmentAttempts.get(ip) ?? { count: 0, until: now + 60_000 };
@@ -152,13 +158,13 @@ export function createApp(runtime: Runtime) {
   app.get("/consent", async (c) => {
     const client = config.clients.find((client) => client.id === c.req.query("client_id") && client.enabled);
     if (!client || !client.redirect_uris.includes(c.req.query("redirect_uri") ?? "")) return c.text("認証リクエストが無効です。サービスからやり直してください。", 400);
+    const consent = consentDetails(c.req.query("scope"), c.req.query("claims"), client.scopes);
+    if (!consent) return c.text("認証リクエストが無効です。サービスからやり直してください。", 400);
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.redirect(`/login?${new URL(c.req.url).searchParams}`);
-    const requested = (c.req.query("scope") ?? "").split(" ");
-    const labels: Record<string, string> = { openid: "あなたを識別するID", profile: "名前・ユーザー名", email: "メールアドレス", groups: "ローカルグループ", offline_access: "ログイン状態の更新" };
     return c.html(<Shell name={config.name} title="サービスへの接続"><section class="card login-card"><p class="eyebrow">CONNECT A SERVICE</p><h1>{client.name}に接続</h1><p class="lede">{session.user.name}として、次の情報を共有します。</p>
-      <ul class="scope-list">{requested.filter((scope) => scope in labels).map((scope) => <li>{labels[scope]}</li>)}</ul>
-      <p class="help">接続先：{new URL(c.req.query("redirect_uri")!).host}</p><button class="primary full" data-action="consent-accept">許可して続ける</button><button class="secondary full" data-action="consent-deny">キャンセル</button>
+      <ul class="scope-list">{consent.labels.map((label) => <li>{label}</li>)}</ul>
+      <p class="help">接続先：{new URL(c.req.query("redirect_uri")!).host}</p><button class="primary full" data-action="consent-accept" data-consent-scope={consent.scope} data-consent-claims={JSON.stringify(consent.claims)}>許可して続ける</button><button class="secondary full" data-action="consent-deny">キャンセル</button>
     </section></Shell>);
   });
   app.notFound((c) => c.html(<Shell name={config.name} title="ページが見つかりません"><section class="card"><h1>ページが見つかりません。</h1><a href="/">ホームへ戻る</a></section></Shell>, 404));

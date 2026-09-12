@@ -4,9 +4,11 @@ import { jwt } from "better-auth/plugins";
 import { getAuthenticatorName, passkey } from "@better-auth/passkey";
 import { oauthProvider } from "@better-auth/oauth-provider";
 import { getMigrations } from "better-auth/db/migration";
+import { defineRequestState } from "@better-auth/core/context";
 import { parse as parseCookie } from "hono/utils/cookie";
 import { scopes, type Settings } from "./config";
 import { hash, openDatabase, Store } from "./store";
+import { clientIPOptions } from "./client-ip";
 
 export const ENROLLMENT_COOKIE = "kitune-enrollment";
 export const FRESH_AGE = 10 * 60;
@@ -41,6 +43,13 @@ export async function createRuntime(settings: Settings, options: { testing?: boo
   const db = openDatabase(settings.databasePath);
   const store = new Store(db);
   const { config } = settings;
+  const authenticatedIdentity = defineRequestState<{ id: string; epoch: number } | null>(() => null);
+  const rememberIdentity = async (id: string) => {
+    const user = store.active(id);
+    const previous = await authenticatedIdentity.get();
+    if (previous && (previous.id !== id || previous.epoch !== user.epoch)) throw new APIError("UNAUTHORIZED");
+    await authenticatedIdentity.set({ id, epoch: user.epoch });
+  };
   const claims = (id: string, requestedScopes: string[]) => {
     const user = store.active(id);
     return {
@@ -71,7 +80,7 @@ export async function createRuntime(settings: Settings, options: { testing?: boo
       cookieCache: { enabled: false },
       additionalFields: { epoch: { type: "number", defaultValue: 0, required: true, input: false } },
     },
-    advanced: { useSecureCookies: config.origin.startsWith("https:"), ipAddress: { ipAddressHeaders: ["fly-client-ip"] } },
+    advanced: { useSecureCookies: config.origin.startsWith("https:"), ipAddress: clientIPOptions(config) },
     rateLimit: { enabled: !options.testing, storage: "database", window: 60, max: 100 },
     socialProviders: settings.discord ? {
       discord: {
@@ -84,6 +93,7 @@ export async function createRuntime(settings: Settings, options: { testing?: boo
           const link = db.query<{ userId: string }, [string]>("SELECT userId FROM account WHERE providerId = 'discord' AND accountId = ?").get(profile.id);
           if (!link) throw new APIError("FORBIDDEN", { message: "許可されていないDiscordアカウントです。" });
           const user = store.active(link.userId);
+          await rememberIdentity(user.id);
           return { name: user.name, email: user.email, emailVerified: Boolean(user.emailVerified), image: undefined };
         },
       },
@@ -91,7 +101,12 @@ export async function createRuntime(settings: Settings, options: { testing?: boo
     databaseHooks: {
       user: { create: { before: async () => false } },
       session: {
-        create: { before: async (session) => ({ data: { ...session, epoch: store.active(session.userId).epoch } }) },
+        create: { before: async (session) => {
+          const identity = await authenticatedIdentity.get();
+          const user = store.active(session.userId);
+          if (!identity || identity.id !== user.id || identity.epoch !== user.epoch) throw new APIError("UNAUTHORIZED");
+          return { data: { ...session, epoch: identity.epoch } };
+        } },
         delete: { before: async (session) => { store.revokeSession(session.id); } },
       },
     },
@@ -102,8 +117,12 @@ export async function createRuntime(settings: Settings, options: { testing?: boo
         // The provider permits varying native loopback ports. This IdP requires
         // a literal configured URI for every client, including local web apps.
         if (ctx.path === "/oauth2/authorize") {
-          const client = config.clients.find((entry) => entry.enabled && entry.id === ctx.query?.client_id);
-          if (!client || !client.redirect_uris.includes(ctx.query?.redirect_uri ?? "")) {
+          // Provider 1.7.4 resumes login/consent through this endpoint with its
+          // verified query, even though the original request used POST.
+          const mode = (ctx as typeof ctx & { authorizeSettings?: { isAuthorize?: boolean } }).authorizeSettings ?? { isAuthorize: true };
+          const parameters = ctx.method === "POST" && mode.isAuthorize === true ? ctx.body : ctx.query;
+          const client = config.clients.find((entry) => entry.enabled && entry.id === parameters?.client_id);
+          if (!client || typeof parameters?.redirect_uri !== "string" || !client.redirect_uris.includes(parameters.redirect_uri)) {
             throw new APIError("BAD_REQUEST", { error: "invalid_request", error_description: "Unregistered redirect_uri" });
           }
         }
@@ -117,6 +136,17 @@ export async function createRuntime(settings: Settings, options: { testing?: boo
           if (ctx.path === "/passkey/verify-registration" && !current && ctx.body?.createSession !== true) {
             throw new APIError("BAD_REQUEST", { message: "初回登録にはcreateSessionが必要です。" });
           }
+          if (ctx.path === "/passkey/verify-registration") {
+            await rememberIdentity(current?.user.id ?? store.enrollment(enrollmentCookie(ctx.request)).id);
+          }
+        }
+        if (ctx.path === "/passkey/verify-authentication") {
+          const credentialId = ctx.body?.response?.id;
+          const credential = typeof credentialId === "string"
+            ? db.query<{ userId: string }, [string]>("SELECT userId FROM passkey WHERE credentialID = ?").get(credentialId)
+            : null;
+          if (!credential) throw new APIError("UNAUTHORIZED");
+          await rememberIdentity(credential.userId);
         }
         // Enrollment credentials only travel in the HttpOnly cookie, never URL queries.
         if (ctx.path.startsWith("/passkey/") && (ctx.query?.context || ctx.body?.context)) throw new APIError("BAD_REQUEST");
@@ -137,7 +167,7 @@ export async function createRuntime(settings: Settings, options: { testing?: boo
           },
           afterVerification: async ({ ctx, verification, user }) => {
             if (!verification.registrationInfo?.userVerified) throw new APIError("FORBIDDEN", { message: "PIN・生体認証が必要です。" });
-            store.active(user.id);
+            await rememberIdentity(user.id);
             const current = await getSessionFromCtx(ctx, { disableCookieCache: true });
             if (current) {
               assertFresh(current.session.createdAt);
@@ -154,7 +184,7 @@ export async function createRuntime(settings: Settings, options: { testing?: boo
             if (!verification.authenticationInfo.userVerified) throw new APIError("FORBIDDEN", { message: "PIN・生体認証が必要です。" });
             const credential = db.query<{ userId: string }, [string]>("SELECT userId FROM passkey WHERE credentialID = ?").get(clientData.id);
             if (!credential) throw new APIError("UNAUTHORIZED");
-            store.active(credential.userId);
+            await rememberIdentity(credential.userId);
           },
         },
       }),
@@ -184,13 +214,22 @@ export async function createRuntime(settings: Settings, options: { testing?: boo
   } satisfies BetterAuthOptions;
   try {
     const version = db.query<{ user_version: number }, []>("PRAGMA user_version").get()!.user_version;
-    if (version > 1) throw new Error("Database schema is newer than this application; refusing to start");
+    if (version > 2) throw new Error("Database schema is newer than this application; refusing to start");
     if (version === 0) {
       const migrations = await getMigrations(authOptions);
       await migrations.runMigrations();
     }
     store.init();
-    db.exec("PRAGMA user_version = 1");
+    if (version < 2) {
+      // A CLI recovery can commit after the async session hook, before INSERT.
+      // Enforce the captured generation at the same instant as persistence.
+      db.transaction(() => {
+        db.exec(`CREATE TRIGGER kitune_session_epoch BEFORE INSERT ON session
+          WHEN NOT EXISTS (SELECT 1 FROM user WHERE id = NEW.userId AND enabled = 1 AND epoch = NEW.epoch)
+          BEGIN SELECT RAISE(ABORT, 'Session identity was revoked'); END;
+          PRAGMA user_version = 2;`);
+      }).immediate();
+    }
     store.reconcile(settings);
     const auth = betterAuth(authOptions);
     await auth.$context;

@@ -14,6 +14,46 @@ afterEach(async () => {
   for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true });
 });
 
+test("account stays readable with a stale session and reauthentication restores device management", async () => {
+  const { runtime, agent } = await fixture(); runtimes.push(runtime);
+  const key = await enroll(runtime, agent);
+  const firstSession = await (await agent.get("/api/auth/get-session")).json();
+  const passkey = runtime.store.db.query<{ id: string }, []>("SELECT id FROM passkey").get()!;
+  runtime.store.db.query("UPDATE session SET createdAt = ?, userAgent = ? WHERE id = ?")
+    .run(new Date(Date.now() - 11 * 60_000).toISOString(), "Stale session device", firstSession.session.id);
+
+  const home = await agent.get("/");
+  expect(home.status).toBe(302);
+  expect(home.headers.get("location")).toBe("/account");
+  const account = await agent.get(home.headers.get("location")!);
+  expect(account.status).toBe(200);
+  expect(account.headers.get("content-type")).toContain("text/html");
+  const html = await account.text();
+  expect(html).toContain("Owner");
+  expect(html).toContain("Primary key");
+  expect(html).toContain('ログイン中の端末を確認するには、<a href="/login">もう一度ログイン</a>してください。');
+  expect(html).not.toContain("Stale session device");
+
+  const devices = await agent.get("/api/auth/list-sessions");
+  expect(devices.status).toBe(403);
+  expect((await devices.json()).code).toBe("SESSION_NOT_FRESH");
+  expect((await agent.get("/api/auth/passkey/generate-register-options")).status).toBe(403);
+  expect((await agent.post("/api/auth/passkey/update-passkey", { id: passkey.id, name: "Changed" })).status).toBe(403);
+  expect((await agent.post(`/account/passkeys/${passkey.id}/delete`, {})).status).toBe(403);
+  expect((await agent.post(`/account/sessions/${firstSession.session.id}/delete`, {})).status).toBe(403);
+
+  expect((await agent.get("/login")).status).toBe(200);
+  const options = await (await agent.get("/api/auth/passkey/generate-authenticate-options")).json();
+  expect((await agent.post("/api/auth/passkey/verify-authentication", { response: key.assertion(options, agent.origin) })).status).toBe(200);
+  const restored = await agent.get("/account");
+  expect(restored.status).toBe(200);
+  const restoredHTML = await restored.text();
+  expect(restoredHTML).toContain("この端末");
+  expect(restoredHTML).toContain("Stale session device");
+  expect(restoredHTML).not.toContain("ログイン中の端末を確認するには、");
+  expect((await agent.post(`/account/sessions/${firstSession.session.id}/delete`, {})).status).toBe(200);
+});
+
 test("authorization POST validates its form body and ignores contradictory URL parameters", async () => {
   const { runtime, agent } = await fixture(); runtimes.push(runtime);
   await enroll(runtime, agent);

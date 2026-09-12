@@ -49,6 +49,20 @@ try {
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "削除", exact: true }).click();
   await page.getByText("最後のログイン方法は削除できません。先に予備のPasskeyを登録してください。", { exact: true }).waitFor();
+  runtime.store.db.query("UPDATE session SET createdAt = ?").run(new Date(Date.now() - 11 * 60_000).toISOString());
+  assert.equal((await page.goto(`${origin}/`))?.status(), 200, "Stale session must still render the account screen");
+  assert.equal(page.url(), `${origin}/account`);
+  await page.getByRole("heading", { name: "テストユーザー", exact: true }).waitFor();
+  const reauthenticate = page.locator(".sessions-card").getByRole("link", { name: "もう一度ログイン", exact: true });
+  await reauthenticate.waitFor();
+  assert.equal(await page.locator(".sessions-card .item-list").count(), 0, "Stale session must not reveal the device list");
+  await page.screenshot({ path: "test-results/account-stale-desktop.png", fullPage: true });
+  await reauthenticate.click();
+  await page.waitForURL(`${origin}/login`);
+  await page.getByRole("button", { name: "Passkeyでログイン" }).click();
+  await page.waitForURL(`${origin}/account`);
+  await page.locator(".sessions-card").getByText("この端末", { exact: true }).waitFor();
+  assert.equal(await reauthenticate.count(), 0, "Reauthentication must restore the device list");
   await page.getByRole("button", { name: "ログアウト", exact: true }).first().click();
   await page.waitForURL(`${origin}/login`);
   await page.screenshot({ path: "test-results/login-desktop.png", fullPage: true });
@@ -79,11 +93,16 @@ try {
   await page.goto(`${origin}/account`);
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "Account screen overflows on mobile");
   await page.screenshot({ path: "test-results/account-mobile.png", fullPage: true });
+  runtime.store.db.query("UPDATE session SET createdAt = ?").run(new Date(Date.now() - 11 * 60_000).toISOString());
+  assert.equal((await page.reload())?.status(), 200);
+  await reauthenticate.waitFor();
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "Stale account screen overflows on mobile");
+  await page.screenshot({ path: "test-results/account-stale-mobile.png", fullPage: true });
   await page.goto(`${origin}/login`);
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "Login screen overflows on mobile");
   await page.screenshot({ path: "test-results/login-mobile.png", fullPage: true });
   assert.deepEqual(errors, [], "Browser JavaScript errors");
-  console.log("Browser integration passed: registration, login, key management, OIDC claims consent/code exchange, mobile layout and token privacy");
+  console.log("Browser integration passed: registration, login, key management, stale-session reauthentication, OIDC claims consent/code exchange, mobile layout and token privacy");
 } catch (error) {
   if (page && !page.isClosed()) {
     console.error("UI failure:", new URL(page.url()).pathname, await page.locator("#status").textContent().catch(() => ""));

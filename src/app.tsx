@@ -120,7 +120,10 @@ export function createApp(runtime: Runtime) {
     if (!session) return c.redirect("/login");
     const user = store.active(session.user.id);
     const passkeys = await auth.api.listPasskeys({ headers: c.req.raw.headers });
-    const sessions = await auth.api.listSessions({ headers: c.req.raw.headers });
+    const sessions = await auth.api.listSessions({ headers: c.req.raw.headers }).catch((error: unknown) => {
+      if (error instanceof APIError && error.body?.code === "SESSION_NOT_FRESH") return null;
+      throw error;
+    });
     const discord = store.db.query<{ accountId: string }, [string]>("SELECT accountId FROM account WHERE userId = ? AND providerId = 'discord' ORDER BY accountId").all(user.id);
     return c.html(<Shell name={config.name} title="アカウント" wide><div class="page-heading"><div><p class="eyebrow">YOUR ACCOUNT</p><h1>{user.name}</h1><p class="lede">ログイン方法と、利用中の端末を管理します。</p></div><button class="secondary" data-action="logout">ログアウト</button></div>
       <div class="account-grid"><section class="card"><h2>Passkey</h2><p class="section-note">予備の端末にも登録しておくと安心です。</p>
@@ -129,7 +132,10 @@ export function createApp(runtime: Runtime) {
         <button class="primary" data-action="add-passkey">Passkeyを追加</button><p class="help">保存先に合わせて名前を付けます。名前はあとで変更できます。</p>
         <p class="help">設定変更には10分以内のログインが必要です。<a href="/login">もう一度ログイン</a></p>
       </section><aside class="card profile-card"><h2>プロフィール</h2><dl><dt>ユーザーID</dt><dd>{user.id}</dd><dt>メール</dt><dd>{user.email}</dd><dt>ローカルグループ</dt><dd>{(JSON.parse(user.groups) as string[]).join("、") || "なし"}</dd></dl><h2>Discord</h2>{discord.length ? <ul class="discord-list">{discord.map((account) => <li>{account.accountId}</li>)}</ul> : <p class="section-note">連携なし</p>}<p class="help">プロフィールとDiscordの連携は管理者が設定します。</p></aside></div>
-      <section class="card sessions-card"><h2>ログイン中の端末</h2><ul class="item-list">{sessions.map((entry) => <li><div><strong>{entry.id === session.session.id ? "この端末" : "別の端末"}</strong><small>{entry.userAgent || "端末情報なし"}</small><small>ログイン：{new Date(entry.createdAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</small></div><button class="text-button danger" data-action="revoke-session" data-id={entry.id}>ログアウト</button></li>)}</ul></section>
+      <section class="card sessions-card"><h2>ログイン中の端末</h2>
+        {sessions ? <ul class="item-list">{sessions.map((entry) => <li><div><strong>{entry.id === session.session.id ? "この端末" : "別の端末"}</strong><small>{entry.userAgent || "端末情報なし"}</small><small>ログイン：{new Date(entry.createdAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</small></div><button class="text-button danger" data-action="revoke-session" data-id={entry.id}>ログアウト</button></li>)}</ul>
+          : <p class="section-note">ログイン中の端末を確認するには、<a href="/login">もう一度ログイン</a>してください。</p>}
+      </section>
     </Shell>);
   });
 

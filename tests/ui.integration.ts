@@ -6,6 +6,13 @@ import { createRuntime } from "../src/auth";
 import { createApp } from "../src/app";
 import { fixtureSettings, clientSecret } from "./helpers";
 
+// Stop before creating servers or launching Chrome in the Codex macOS sandbox.
+if (process.platform === "darwin" && process.env.CODEX_SANDBOX === "seatbelt") {
+  throw new Error(
+    'Chrome/Chromium cannot start in the Codex macOS sandbox. Run this UI test with sandbox_permissions="require_escalated".',
+  );
+}
+
 let app: ReturnType<typeof createApp> | undefined;
 const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (r) => app ? app.fetch(r) : new Response("Starting", { status: 503 }) });
 const origin = `http://localhost:${server.port}`;

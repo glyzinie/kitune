@@ -94,7 +94,23 @@
         <p class="services-lede">サービスごとに別のクライアントIDとsecretを登録します。基本scopeは<code>openid profile email</code>、認証方式は<code>client_secret_basic</code>が既定です。必要に応じて<code>client_secret_post</code>も選べます。実サービスへの接続確認は利用環境で行い、ここでは設定例と互換性の範囲を示します。</p>
         <div class="service-grid">
           <article class="service-card">
-            <div class="service-top"><span class="service-number">01</span><span class="service-version">HEADSCALE 0.29.3</span></div>
+            <div class="service-top"><span class="service-number">01</span><span class="service-version">TAILSCALE</span></div>
+            <h3>Tailscale</h3>
+            <p>互換性確認用の初期例です。WebFingerのissuerとDiscoveryのissuerを一致させ、まずBasic認証で接続します。</p>
+            <pre class="service-code" tabindex="0" aria-label="Tailscale用Kituneクライアント設定"><code>id = "tailscale"
+name = "Tailscale"
+redirect_uris = ["https://login.tailscale.com/a/oauth_response"]
+secret_env = "TAILSCALE_CLIENT_SECRET"
+scopes = ["openid", "profile", "email"]
+require_pkce = false</code></pre>
+            <dl class="service-facts">
+              <div><dt>callback</dt><dd><code>https://login.tailscale.com/a/oauth_response</code></dd></div>
+              <div><dt>issuer</dt><dd><code>https://id.example.com/api/auth</code>（WebFingerとDiscoveryで一致）</dd></div>
+              <div><dt>境界</dt><dd>実サービスへの接続とPKCE送信の挙動は未確認</dd></div>
+            </dl>
+          </article>
+          <article class="service-card">
+            <div class="service-top"><span class="service-number">02</span><span class="service-version">HEADSCALE 0.29.3</span></div>
             <h3>Headscale</h3>
             <p>Headscale側でPKCEを有効にし、S256を使います。</p>
             <pre class="service-code" tabindex="0" aria-label="Headscale用Kituneクライアント設定"><code>id = "headscale"
@@ -109,7 +125,7 @@ scopes = ["openid", "profile", "email"]
             </dl>
           </article>
           <article class="service-card">
-            <div class="service-top"><span class="service-number">02</span><span class="service-version">GITEA 1.27.3</span></div>
+            <div class="service-top"><span class="service-number">03</span><span class="service-version">GITEA 1.27.3</span></div>
             <h3>Gitea</h3>
             <p>外部OIDCクライアントがPKCE・nonceを送らないため、このクライアントだけ例外にします。</p>
             <pre class="service-code" tabindex="0" aria-label="Gitea用Kituneクライアント設定"><code>id = "gitea"
@@ -122,22 +138,6 @@ require_pkce = false</code></pre>
               <div><dt>認証ソース</dt><dd><code>kitune</code></dd></div>
               <div><dt>callback</dt><dd><code>https://gitea.example.com/user/oauth2/kitune/callback</code></dd></div>
               <div><dt>注意</dt><dd><code>offline_access</code>は付けません</dd></div>
-            </dl>
-          </article>
-          <article class="service-card">
-            <div class="service-top"><span class="service-number">03</span><span class="service-version">TAILSCALE</span></div>
-            <h3>Tailscale</h3>
-            <p>互換性確認用の初期例です。WebFingerのissuerとDiscoveryのissuerを一致させ、まずBasic認証で接続します。</p>
-            <pre class="service-code" tabindex="0" aria-label="Tailscale用Kituneクライアント設定"><code>id = "tailscale"
-name = "Tailscale"
-redirect_uris = ["https://login.tailscale.com/a/oauth_response"]
-secret_env = "TAILSCALE_CLIENT_SECRET"
-scopes = ["openid", "profile", "email"]
-require_pkce = false</code></pre>
-            <dl class="service-facts">
-              <div><dt>callback</dt><dd><code>https://login.tailscale.com/a/oauth_response</code></dd></div>
-              <div><dt>issuer</dt><dd><code>https://id.example.com/api/auth</code>（WebFingerとDiscoveryで一致）</dd></div>
-              <div><dt>境界</dt><dd>実サービスへの接続とPKCE送信の挙動は未確認</dd></div>
             </dl>
           </article>
         </div>

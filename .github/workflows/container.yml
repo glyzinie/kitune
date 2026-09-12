@@ -2,9 +2,21 @@ name: Container
 
 on:
   pull_request:
+    paths-ignore:
+      - "site/**"
+      - "scripts/build-site.ts"
+      - "scripts/preview-site.ts"
+      - "guides/pages.md"
+      - ".github/workflows/pages.yml"
   push:
     branches: [main]
     tags: ["v*"]
+    paths-ignore:
+      - "site/**"
+      - "scripts/build-site.ts"
+      - "scripts/preview-site.ts"
+      - "guides/pages.md"
+      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 concurrency:

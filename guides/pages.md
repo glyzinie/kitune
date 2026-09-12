@@ -62,4 +62,6 @@ BunがCSS・JavaScript・faviconにハッシュ付きのファイル名を付け
 
 以後はサイトのソース、ビルドスクリプト、`package.json`、`.bun-version` またはPages workflowに変更を加えて `main` へpushすると、Actionsがビルドして再公開します。workflowが公開するのは `site/dist/` だけです。設定、秘密値、SQLiteデータ、バックアップはサイトのソースや生成先に置かないでください。
 
+`site/`、`scripts/build-site.ts`、`scripts/preview-site.ts`、`guides/pages.md`、`.github/workflows/pages.yml` だけを変更したPRと `main` へのpushでは、Container workflowのテスト・ビルド・公開を省略します。それ以外のファイルも変更した場合は実行します。`package.json`、`bun.lock`、`.bun-version` はアプリと共有するため除外しません。`v*` タグのpushと手動実行では、変更ファイルにかかわらず実行します。
+
 コミット・push・GitHub Pagesの有効化と公開は、ローカルでのサイト作成とは別の操作です。

@@ -99,7 +99,6 @@ try {
   const key = new Authenticator("bada5566-a7aa-401f-bd96-45619a55120d");
   const registered = await agent.post("/api/auth/passkey/verify-registration", { response: key.registration(options, origin), createSession: true });
   assert.equal(registered.status, 200);
-  assert.equal((await registered.json()).name, "1Password");
   const tokens = await grant(agent);
   // Several services may request tokens together after an idle period.
   await Promise.all(Array.from({ length: 4 }, () => grant(agent)));

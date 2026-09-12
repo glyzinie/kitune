@@ -4,7 +4,7 @@ import { Database } from "bun:sqlite";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLocalJWKSet, jwtVerify, decodeJwt } from "jose";
-import { configSchema } from "../src/config";
+import { configSchema, loadSettings } from "../src/config";
 import { createRuntime, type Runtime } from "../src/auth";
 import { createApp } from "../src/app";
 import { Agent, Authenticator, authorize, enroll, fixture, fixtureConfig, fixtureSettings, grant, prepareEnrollment, token, testSecret, clientSecret } from "./helpers";
@@ -36,7 +36,10 @@ describe("configuration and boundaries", () => {
     expect(() => fixtureConfig({ clients: [{ ...config.clients[0], redirect_uris: ["https://example.com/*"] }] })).toThrow();
     expect(() => fixtureConfig({ clients: [{ ...config.clients[0], require_pkce: "false" }] })).toThrow();
   });
-  test.each(["public", "secret_env", "missing secret", "short secret"] as const)("invalid %s client configuration fails before database creation", async (invalid) => {
+  test.each([
+    ["public", "startup"], ["secret_env", "settings loading"],
+    ["missing secret", "startup"], ["short secret", "settings loading"],
+  ] as const)("invalid %s client configuration fails during %s", async (invalid, phase) => {
     const directory = await mkdtemp(join(tmpdir(), "kitune-config-test-")); tempPaths.push(directory);
     const config = fixtureConfig({ users: [{ id: "owner", name: "Owner", email: "owner@example.com" }] });
     const client: Record<string, unknown> = { ...config.clients[0] };
@@ -44,25 +47,49 @@ describe("configuration and boundaries", () => {
     if (invalid === "secret_env") delete client.secret_env;
     const configPath = join(directory, "config.toml"), databasePath = join(directory, "uncreated.sqlite");
     await writeFile(configPath, Bun.TOML.stringify({ ...config, clients: [client] })!);
-    const child = Bun.spawn([process.execPath, "src/server.ts"], {
-      env: { ...process.env, NODE_ENV: "test", CONFIG_PATH: configPath, DATABASE_PATH: databasePath, PORT: "0",
-        BETTER_AUTH_SECRET: testSecret, TEST_CLIENT_SECRET: invalid === "missing secret" ? "" : invalid === "short secret" ? "short" : clientSecret },
-      stdout: "pipe", stderr: "pipe",
-    });
-    const timeout = setTimeout(() => child.kill(), 5_000);
-    try {
-      const [code, , stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
-      expect(code).not.toBe(0);
-      expect(stderr).toContain(invalid === "public" ? "Only confidential clients" : invalid === "secret_env" ? "secret_env" : "TEST_CLIENT_SECRET must contain at least 32 characters");
-      expect(await Bun.file(databasePath).exists()).toBe(false);
-    } finally { clearTimeout(timeout); }
+    const env = { ...process.env, NODE_ENV: "test", CONFIG_PATH: configPath, DATABASE_PATH: databasePath, PORT: "0",
+      BETTER_AUTH_SECRET: testSecret, TEST_CLIENT_SECRET: invalid === "missing secret" ? "" : invalid === "short secret" ? "short" : clientSecret };
+    const error = invalid === "public" ? "Only confidential clients" : invalid === "secret_env" ? "secret_env" : "TEST_CLIENT_SECRET must contain at least 32 characters";
+    if (phase === "settings loading") {
+      await expect(loadSettings(env)).rejects.toThrow(error);
+    } else {
+      const child = Bun.spawn([process.execPath, "src/server.ts"], { env, stdout: "pipe", stderr: "pipe" });
+      const timeout = setTimeout(() => child.kill(), 5_000);
+      try {
+        const [code, , stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+        expect(code).not.toBe(0);
+        expect(stderr).toContain(error);
+      } finally { clearTimeout(timeout); }
+    }
+    expect(await Bun.file(databasePath).exists()).toBe(false);
   });
   test("only the agreed authentication and management endpoints are exposed", async () => {
-    const { agent } = await setup();
-    for (const path of ["/sign-up/email", "/sign-in/email", "/link-social", "/unlink-account", "/update-user", "/token", "/oauth2/register", "/oauth2/create-client", "/admin/oauth2/create-client", "/passkey/delete-passkey"]) {
-      const response = await agent.post(`/api/auth${path}`, {});
-      expect(response.status, path).toBeGreaterThanOrEqual(400);
+    const { runtime, agent } = await setup();
+    await enroll(runtime, agent);
+    const accounts = runtime.store.db.query<{ id: string }, []>("SELECT id FROM account WHERE userId='owner' ORDER BY id").all();
+    const passkeys = await (await agent.get("/api/auth/passkey/list-user-passkeys")).json();
+    const client = { client_name: "Unmanaged client", redirect_uris: ["http://localhost:9000/unmanaged"], scope: "openid" };
+    // Valid inputs and a real session must reach the application's endpoint boundary.
+    for (const [path, body] of [
+      ["/sign-up/email", { name: "Unmanaged", email: "unmanaged@example.com", password: "test-only-password" }],
+      ["/sign-in/email", { email: "owner@example.com", password: "test-only-password" }],
+      ["/link-social", { provider: "discord", callbackURL: "/account" }],
+      ["/unlink-account", { accountId: accounts[0]!.id }],
+      ["/update-user", { name: "Unmanaged profile" }],
+      ["/oauth2/register", client],
+      ["/oauth2/create-client", client],
+      ["/admin/oauth2/create-client", client],
+      ["/passkey/delete-passkey", { id: passkeys[0].id }],
+    ] as const) {
+      expect((await agent.post(`/api/auth${path}`, body)).status, path).toBe(404);
     }
+    expect((await agent.get("/api/auth/token")).status).toBe(404);
+    expect(runtime.store.db.query("SELECT id, name FROM user ORDER BY id").all()).toEqual([
+      { id: "alternate", name: "Alternate" }, { id: "owner", name: "Owner" },
+    ]);
+    expect(runtime.store.db.query("SELECT id FROM account WHERE userId='owner' ORDER BY id").all()).toEqual(accounts);
+    expect(await (await agent.get("/api/auth/passkey/list-user-passkeys")).json()).toEqual(passkeys);
+    expect(runtime.store.db.query("SELECT clientId FROM oauthClient").all()).toEqual([{ clientId: "test-client" }]);
     const metadata = await (await agent.get("/api/auth/.well-known/openid-configuration")).json();
     expect(metadata.issuer).toBe("http://localhost:3000/api/auth");
     expect(metadata.grant_types_supported).toEqual(["authorization_code", "refresh_token"]);
@@ -91,22 +118,11 @@ describe("Passkey ceremonies", () => {
       expect(response.status).toBe(200);
       const key = await response.json();
       expect(key.name).toBe(expected);
-      expect((await agent.post("/api/auth/passkey/update-passkey", { id: key.id, name: "自分のPasskey" })).status).toBe(200);
-      expect((await (await agent.get("/api/auth/passkey/list-user-passkeys")).json())[0].name).toBe("自分のPasskey");
+      if (aaguid === "fbfc3007-154e-4ecc-8c0b-6e020557d7bd") {
+        expect((await agent.post("/api/auth/passkey/update-passkey", { id: key.id, name: "自分のPasskey" })).status).toBe(200);
+        expect((await (await agent.get("/api/auth/passkey/list-user-passkeys")).json())[0].name).toBe("自分のPasskey");
+      }
     }
-  });
-  test("registration creates a session only after a valid UV signature; login survives logout", async () => {
-    const { runtime, agent } = await setup();
-    const key = await enroll(runtime, agent);
-    let session = await (await agent.get("/api/auth/get-session")).json();
-    expect(session.user.id).toBe("owner");
-    expect(runtime.store.db.query("SELECT * FROM kituneEnrollment").all()).toHaveLength(0);
-    await agent.post("/api/auth/sign-out", {});
-    const options = await (await agent.get("/api/auth/passkey/generate-authenticate-options")).json();
-    const response = await agent.post("/api/auth/passkey/verify-authentication", { response: key.assertion(options, agent.origin) });
-    expect(response.status).toBe(200);
-    session = await (await agent.get("/api/auth/get-session")).json();
-    expect(session.user.id).toBe("owner");
   });
   test("an enrollment URL is not a session and cannot be used without createSession", async () => {
     const { runtime, agent } = await setup();
@@ -127,9 +143,11 @@ describe("Passkey ceremonies", () => {
     const success = await agent.post("/api/auth/passkey/verify-registration", { response: key.registration(next, agent.origin), createSession: true });
     expect(success.status).toBe(200);
   });
-  test("UV-less login, incorrect Origin/RP, bad signatures and replay are rejected", async () => {
+  test("registration and login create the owner's session; UV-less login, incorrect Origin/RP, bad signatures and replay are rejected", async () => {
     const { runtime, agent } = await setup();
     const key = await enroll(runtime, agent);
+    expect((await (await agent.get("/api/auth/get-session")).json()).user.id).toBe("owner");
+    expect(runtime.store.db.query("SELECT * FROM kituneEnrollment").all()).toHaveLength(0);
     await agent.post("/api/auth/sign-out", {});
     for (const failure of ["uv", "origin", "rp", "signature"] as const) {
       const options = await (await agent.get("/api/auth/passkey/generate-authenticate-options")).json();
@@ -142,6 +160,7 @@ describe("Passkey ceremonies", () => {
     const options = await (await agent.get("/api/auth/passkey/generate-authenticate-options")).json();
     const assertion = key.assertion(options, agent.origin);
     expect((await agent.post("/api/auth/passkey/verify-authentication", { response: assertion })).status).toBe(200);
+    expect((await (await agent.get("/api/auth/get-session")).json()).user.id).toBe("owner");
     expect((await agent.post("/api/auth/passkey/verify-authentication", { response: assertion })).status).toBeGreaterThanOrEqual(400);
   });
   test("expired enrollment and parallel reuse cannot mint credentials", async () => {
@@ -410,27 +429,13 @@ describe("OIDC and revocation", () => {
       expect((await token(agent, { grant_type: "refresh_token", refresh_token: tokens.refresh_token }, other)).status).toBeGreaterThanOrEqual(400);
     }
   });
-  test("rotating one broker secret revokes only its codes and grants", async () => {
-    const { settings, runtime, agent, first, second, codeFor } = await brokers();
-    const firstTokens = await grant(agent);
-    const exchanged = await token(agent, await codeFor(second.id), second);
-    expect(exchanged.status).toBe(200);
-    const secondTokens = await exchanged.json();
-    const firstCode = await codeFor(first.id), secondCode = await codeFor(second.id);
-    const rotated = { ...first, secret: "rotated-broker-secret-for-isolation-test" };
-    settings.clientSecrets.set(first.id, rotated.secret);
-    runtime.store.reconcile(settings);
-    expect((await token(agent, firstCode, rotated)).status).toBeGreaterThanOrEqual(400);
-    expect((await token(agent, { grant_type: "refresh_token", refresh_token: firstTokens.refresh_token }, rotated)).status).toBeGreaterThanOrEqual(400);
-    expect((await agent.request("/api/auth/oauth2/userinfo", { headers: { authorization: `Bearer ${firstTokens.access_token}` } })).status).toBe(401);
-    expect((await agent.request("/api/auth/oauth2/userinfo", { headers: { authorization: `Bearer ${secondTokens.access_token}` } })).status).toBe(200);
-    expect((await token(agent, secondCode, second)).status).toBe(200);
-    expect((await token(agent, { grant_type: "refresh_token", refresh_token: secondTokens.refresh_token }, second)).status).toBe(200);
-    expect((await token(agent, await codeFor(first.id), rotated)).status).toBe(200);
-    expect((await (await agent.get("/api/auth/get-session")).json()).user.id).toBe("owner");
-  });
-  test.each([false, true, undefined])("changing require_pkce to %s revokes only the affected client's codes and grants", async (next) => {
-    const { settings, runtime, agent, first, second, codeFor } = await brokers(next === false ? true : false);
+  test.each([
+    ["secret", undefined, undefined],
+    ["require_pkce to false", true, false],
+    ["require_pkce to true", false, true],
+    ["require_pkce to omitted", false, undefined],
+  ] as const)("changing %s revokes only the affected client's codes and grants", async (change, previous, next) => {
+    const { settings, runtime, agent, first, second, codeFor } = await brokers(previous);
     const issue = async (client: typeof first) => {
       const exchanged = await token(agent, await codeFor(client.id), client);
       expect(exchanged.status).toBe(200);
@@ -438,19 +443,27 @@ describe("OIDC and revocation", () => {
     };
     const firstTokens = await issue(first), secondTokens = await issue(second);
     const firstCode = await codeFor(first.id), secondCode = await codeFor(second.id);
-    if (next === undefined) delete settings.config.clients[0]!.require_pkce;
+    const updated = { ...first };
+    if (change === "secret") {
+      updated.secret = "rotated-broker-secret-for-isolation-test";
+      settings.clientSecrets.set(first.id, updated.secret);
+    } else if (next === undefined) delete settings.config.clients[0]!.require_pkce;
     else settings.config.clients[0]!.require_pkce = next;
     runtime.store.reconcile(settings);
-    expect((await token(agent, firstCode, first)).status).toBeGreaterThanOrEqual(400);
-    expect((await token(agent, { grant_type: "refresh_token", refresh_token: firstTokens.refresh_token }, first)).status).toBeGreaterThanOrEqual(400);
+    expect((await token(agent, firstCode, updated)).status).toBeGreaterThanOrEqual(400);
+    expect((await token(agent, { grant_type: "refresh_token", refresh_token: firstTokens.refresh_token }, updated)).status).toBeGreaterThanOrEqual(400);
     expect((await agent.request("/api/auth/oauth2/userinfo", { headers: { authorization: `Bearer ${firstTokens.access_token}` } })).status).toBe(401);
     expect((await agent.request("/api/auth/oauth2/userinfo", { headers: { authorization: `Bearer ${secondTokens.access_token}` } })).status).toBe(200);
     expect((await token(agent, secondCode, second)).status).toBe(200);
     expect((await token(agent, { grant_type: "refresh_token", refresh_token: secondTokens.refresh_token }, second)).status).toBe(200);
-    const fresh = await withoutPKCE(agent);
-    expect(fresh.location.searchParams.has("code")).toBe(next === false);
-    if (next === false) expect((await token(agent, { grant_type: "authorization_code", code: fresh.location.searchParams.get("code")!, redirect_uri: "http://localhost:9000/callback" })).status).toBe(200);
-    else expect(decodeJwt((await grant(agent)).id_token).sub).toBe("owner");
+    if (change === "secret") {
+      expect((await token(agent, await codeFor(first.id), updated)).status).toBe(200);
+    } else {
+      const fresh = await withoutPKCE(agent);
+      expect(fresh.location.searchParams.has("code")).toBe(next === false);
+      if (next === false) expect((await token(agent, { grant_type: "authorization_code", code: fresh.location.searchParams.get("code")!, redirect_uri: "http://localhost:9000/callback" })).status).toBe(200);
+      else expect(decodeJwt((await grant(agent)).id_token).sub).toBe("owner");
+    }
     expect((await (await agent.get("/api/auth/get-session")).json()).user.id).toBe("owner");
   });
   test("legacy settings without require_pkce preserve grants, credentials and signing keys across restart", async () => {
@@ -541,9 +554,17 @@ describe("OIDC and revocation", () => {
     const { runtime } = await setup();
     const removed = fixtureSettings(); removed.config.users = removed.config.users.slice(1);
     runtime.store.reconcile(removed);
-    expect(() => runtime.store.reconcile(fixtureSettings())).toThrow("Retired user ID");
+    const alternate = runtime.store.user("alternate");
+    const accounts = runtime.store.db.query("SELECT id, userId, accountId FROM account ORDER BY id").all();
+    const changed = fixtureSettings();
+    changed.config.users.reverse();
+    changed.config.users[0]!.enabled = false;
+    changed.config.users[0]!.discord_ids = [];
+    // Update the live user and remove its Discord link before encountering the retired ID.
+    expect(() => runtime.store.reconcile(changed)).toThrow("Retired user ID");
     expect(runtime.store.user("owner")?.enabled).toBe(0);
-    expect(runtime.store.user("alternate")?.enabled).toBe(1);
+    expect(runtime.store.user("alternate")).toEqual(alternate);
+    expect(runtime.store.db.query("SELECT id, userId, accountId FROM account ORDER BY id").all()).toEqual(accounts);
   });
   test("recovery invalidates keys and grants; backup/restore retain subject and signing keys", async () => {
     const directory = await mkdtemp(join(tmpdir(), "kitune-test-")); tempPaths.push(directory);

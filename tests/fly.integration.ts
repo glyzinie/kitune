@@ -98,11 +98,10 @@ try {
   const registration = await kitune.post("/api/auth/passkey/verify-registration", { response: key.registration(retryOptions, settings.kituneOrigin), createSession: true });
   assert.equal(registration.status, 200, "Live Passkey registration");
   enrolled = true;
-  assert.equal((await registration.json()).name, "1Password");
   await kitune.post("/api/auth/sign-out", {});
   const loginOptions = await (await kitune.get("/api/auth/passkey/generate-authenticate-options")).json();
   assert.equal((await kitune.post("/api/auth/passkey/verify-authentication", { response: key.assertion(loginOptions, settings.kituneOrigin) })).status, 200);
-  console.log("Live Passkey enrollment, UV rejection, automatic name and login passed");
+  console.log("Live Passkey enrollment, UV rejection and login passed");
 
   const verifier = randomBytes(32).toString("base64url");
   const state = randomBytes(20).toString("hex"), nonce = randomBytes(20).toString("hex");

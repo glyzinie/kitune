@@ -82,7 +82,7 @@ document.addEventListener("click", async (event) => {
     }
   } catch (error) {
     status.textContent = error instanceof Error && error.name === "NotAllowedError"
-      ? "操作をキャンセルしたか、時間が経過しました。もう一度お試しください。"
+      ? "操作がキャンセルされたか、制限時間を超えました。もう一度お試しください。"
       : error instanceof Error ? error.message : "処理に失敗しました。";
   } finally {
     buttons.forEach((button) => { button.disabled = false; });

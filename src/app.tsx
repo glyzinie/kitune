@@ -95,8 +95,8 @@ export function createApp(runtime: Runtime) {
   </section></Shell>));
   app.get("/enroll", (c) => c.html(<Shell name={config.name} title="Passkeyの初回登録"><section class="card login-card">
     <p class="eyebrow">FIRST STEP</p><h1>あなたのPasskeyを。</h1><p class="lede">この端末やパスワードマネージャーに保存して、<br/>パスワードなしでログインできます。</p>
-    <button class="primary full with-icon" data-action="enroll"><Icon name="passkey"/>Passkeyを登録する</button><p class="help">登録URLは15分間、一度だけ使えます。<br/>登録をキャンセルした場合は、期限内にやり直せます。</p>
-    <p class="help">保存先に合わせて名前を付けます。名前はあとで変更できます。</p>
+    <button class="primary full with-icon" data-action="enroll"><Icon name="passkey"/>Passkeyを登録する</button><p class="help">登録URLは発行から15分間有効です。<br/>登録が完了すると再利用できなくなります。<br/>登録をキャンセルした場合は、期限内にやり直せます。</p>
+    <p class="help">保存先に応じた名前を自動で設定します。名前はあとで変更できます。</p>
     <a class="subtle-link" href="/login">ログイン画面へ</a>
   </section></Shell>));
 
@@ -134,9 +134,9 @@ export function createApp(runtime: Runtime) {
       <div class="account-grid"><section class="card"><h2 class="icon-heading"><Icon name="passkey"/>Passkey</h2><p class="section-note">予備の端末にも登録しておくと安心です。</p>
         <ul class="item-list">{passkeys.map((key) => <li><div><strong>{key.name || "名前のないPasskey"}</strong><small>{key.backedUp ? "同期されたPasskey" : "端末・セキュリティキー"}</small></div><div class="row-actions"><button class="text-button with-icon" data-action="rename-passkey" data-id={key.id} data-name={key.name || ""}><Icon name="edit"/>名前変更</button><button class="text-button danger with-icon" data-action="delete-passkey" data-id={key.id}><Icon name="delete"/>削除</button></div></li>)}</ul>
         {!passkeys.length && <p class="empty">Passkeyはまだ登録されていません。</p>}
-        <button class="primary with-icon" data-action="add-passkey"><Icon name="add"/>Passkeyを追加</button><p class="help">保存先に合わせて名前を付けます。名前はあとで変更できます。</p>
-        <p class="help">設定変更には10分以内のログインが必要です。<a href="/login">もう一度ログイン</a></p>
-      </section><aside class="card profile-card"><h2 class="icon-heading"><Icon name="person"/>プロフィール</h2><dl><dt>ユーザーID</dt><dd>{user.id}</dd><dt>メール</dt><dd>{user.email}</dd><dt>ローカルグループ</dt><dd>{(JSON.parse(user.groups) as string[]).join("、") || "なし"}</dd></dl><h2 class="icon-heading"><Icon name="discord"/>Discord</h2>{discord.length ? <ul class="discord-list">{discord.map((account) => <li>{account.accountId}</li>)}</ul> : <p class="section-note">連携なし</p>}<p class="help">プロフィールとDiscordの連携は管理者が設定します。</p></aside></div>
+        <button class="primary with-icon" data-action="add-passkey"><Icon name="add"/>Passkeyを追加</button><p class="help">保存先に応じた名前を自動で設定します。名前はあとで変更できます。</p>
+        <p class="help">ログインから10分を過ぎた場合は、変更前に<a href="/login">もう一度ログイン</a>してください。</p>
+      </section><aside class="card profile-card"><h2 class="icon-heading"><Icon name="person"/>プロフィール</h2><dl><dt>ユーザーID</dt><dd>{user.id}</dd><dt>メールアドレス</dt><dd>{user.email}</dd><dt>Kituneでの所属グループ</dt><dd>{(JSON.parse(user.groups) as string[]).join("、") || "なし"}</dd></dl><h2 class="icon-heading"><Icon name="discord"/>Discord</h2>{discord.length ? <ul class="discord-list">{discord.map((account) => <li>{account.accountId}</li>)}</ul> : <p class="section-note">連携なし</p>}<p class="help">プロフィールとDiscordの連携は管理者が設定します。</p></aside></div>
       <section class="card sessions-card"><h2 class="icon-heading"><Icon name="devices"/>ログイン中の端末</h2>
         {sessions ? <ul class="item-list">{sessions.map((entry) => <li><div><strong>{entry.id === session.session.id ? "この端末" : "別の端末"}</strong><small>{entry.userAgent || "端末情報なし"}</small><small>ログイン：{new Date(entry.createdAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</small></div><button class="text-button danger with-icon" data-action="revoke-session" data-id={entry.id}><Icon name="logout"/>ログアウト</button></li>)}</ul>
           : <p class="section-note">ログイン中の端末を確認するには、<a href="/login">もう一度ログイン</a>してください。</p>}
@@ -173,7 +173,7 @@ export function createApp(runtime: Runtime) {
     if (!consent) return c.text("認証リクエストが無効です。サービスからやり直してください。", 400);
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.redirect(`/login?${new URL(c.req.url).searchParams}`);
-    return c.html(<Shell name={config.name} title="サービスへの接続"><section class="card login-card"><p class="eyebrow">CONNECT A SERVICE</p><h1>{client.name}に接続</h1><p class="lede">{session.user.name}として、次の情報を共有します。</p>
+    return c.html(<Shell name={config.name} title="サービスへの接続"><section class="card login-card"><p class="eyebrow">CONNECT A SERVICE</p><h1>{client.name}に接続</h1><p class="lede">{session.user.name}として接続します。共有する情報と、許可する操作を確認してください。</p>
       <ul class="scope-list">{consent.labels.map((label) => <li>{label}</li>)}</ul>
       <p class="help">接続先：{new URL(c.req.query("redirect_uri")!).host}</p><button class="primary full" data-action="consent-accept" data-consent-scope={consent.scope} data-consent-claims={JSON.stringify(consent.claims)}>許可して続ける</button><button class="secondary full" data-action="consent-deny">キャンセル</button>
     </section></Shell>);

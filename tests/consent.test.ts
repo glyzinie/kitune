@@ -34,7 +34,7 @@ describe("OIDC consent details", () => {
         "名",
         "姓",
         "メールアドレス",
-        "メールアドレスの確認状態",
+        "メールアドレスが確認済みかどうか",
       ],
     });
   });
@@ -49,7 +49,7 @@ describe("OIDC consent details", () => {
     expect(details).toEqual({
       scope: "openid email",
       claims: { userinfo: { email: null } },
-      labels: ["あなたを識別するID", "メールアドレス・確認状態"],
+      labels: ["あなたを識別するID", "メールアドレス（確認済みかどうかを含む）"],
     });
   });
 

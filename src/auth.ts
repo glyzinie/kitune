@@ -166,7 +166,7 @@ export async function createRuntime(settings: Settings, options: { testing?: boo
             return { id: user.id, name: user.email, displayName: user.name };
           },
           afterVerification: async ({ ctx, verification, user }) => {
-            if (!verification.registrationInfo?.userVerified) throw new APIError("FORBIDDEN", { message: "PIN・生体認証が必要です。" });
+            if (!verification.registrationInfo?.userVerified) throw new APIError("FORBIDDEN", { message: "PINまたは生体認証による本人確認が必要です。" });
             await rememberIdentity(user.id);
             const current = await getSessionFromCtx(ctx, { disableCookieCache: true });
             if (current) {
@@ -181,7 +181,7 @@ export async function createRuntime(settings: Settings, options: { testing?: boo
         },
         authentication: {
           afterVerification: async ({ verification, clientData }) => {
-            if (!verification.authenticationInfo.userVerified) throw new APIError("FORBIDDEN", { message: "PIN・生体認証が必要です。" });
+            if (!verification.authenticationInfo.userVerified) throw new APIError("FORBIDDEN", { message: "PINまたは生体認証による本人確認が必要です。" });
             const credential = db.query<{ userId: string }, [string]>("SELECT userId FROM passkey WHERE credentialID = ?").get(clientData.id);
             if (!credential) throw new APIError("UNAUTHORIZED");
             await rememberIdentity(credential.userId);

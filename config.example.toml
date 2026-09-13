@@ -26,7 +26,7 @@ groups = ["personal"]
 # discord_ids = ["333333333333333333"]
 # groups = []
 
-# secretを保持できるWebサービスごとに、別のclient IDとsecretを登録します。
+# シークレットを保持できるWebサービスごとに、別のクライアントIDとシークレットを登録します。
 # この例はHeadscale 0.29.3です。Headscale側でもS256 PKCEを有効にします。
 [[clients]]
 id = "headscale"
@@ -34,11 +34,11 @@ name = "Headscale"
 redirect_uris = ["https://headscale.example.com/oidc/callback"]
 # 省略時もclient_secret_basic。client_secret_postも選べます。
 token_endpoint_auth_method = "client_secret_basic"
-# 全クライアントで必須。環境変数に32文字以上のsecretを設定してください。
+# secret_envは全クライアントで必須です。指定した環境変数には32文字以上のシークレットを設定してください。
 secret_env = "HEADSCALE_CLIENT_SECRET"
 scopes = ["openid", "profile", "email"]
 skip_consent = false
-# require_pkceは省略時trueです。既定のS256必須を維持するため省略しています。
+# require_pkceを省略した場合は、S256方式のPKCEが必須です。この例では省略しています。
 
 # Gitea 1.27.3の外部OIDCクライアントはPKCEを送らないため、このクライアントだけ例外にします。
 # Giteaの認証ソース名はkitune、callbackはその名前を含む固定URLです。

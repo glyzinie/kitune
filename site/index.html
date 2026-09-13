@@ -76,22 +76,22 @@
           <article class="feature">
             <div class="feature-top"><span class="feature-number">02</span><span class="feature-category">CONFIGURE</span></div>
             <h3>管理の起点は、設定ファイル。</h3>
-            <p>ユーザー、Discordの紐付け、OIDCクライアントをTOMLで管理。変更は設定を更新し、再起動して反映します。</p>
+            <p>ユーザー、Discordの紐付け、OIDCクライアントをTOMLで管理。設定ファイルを編集してKituneを再起動すると、変更が反映されます。</p>
             <span class="feature-footnote">Configuration as the source of truth</span>
           </article>
           <article class="feature">
             <div class="feature-top"><span class="feature-number">03</span><span class="feature-category">CONNECT</span></div>
             <h3>サービスへ、直接つながる。</h3>
-            <p>Headscale・Gitea・Tailscaleなどへ、Kituneから独立したOIDCクライアントで接続。複数のKituneをまとめるときだけ、家族・サークル用の共有Dexを組み合わせます。</p>
+            <p>Headscale・Gitea・TailscaleなどのサービスごとにOIDCクライアントを設定し、Kituneと直接連携します。複数のKituneをまとめるときだけ、家族・サークル用の共有Dexを組み合わせます。</p>
             <a class="feature-footnote text-link" href="https://github.com/glyzinie/Kitune/blob/main/guides/federation.md">認証の構成を見る <span aria-hidden="true">↗</span></a>
           </article>
         </div>
-        <div class="protocol-note"><span class="protocol-label">BUILT ON OIDC</span><p>認可コード + S256 PKCE、ローテーション付きrefresh tokenに対応。接続先は、クライアントsecretを保持できるWebサーバーです。PKCEは既定でS256必須、非対応サービスだけクライアントごとに<code>require_pkce = false</code>を指定できます。公開クライアントは対象にしません。</p></div>
+        <div class="protocol-note"><span class="protocol-label">BUILT ON OIDC</span><p>認可コード、S256方式のPKCE、ローテーションに対応したリフレッシュトークンを利用できます。接続先は、クライアントシークレットを保持できるWebサーバーです。<code>require_pkce</code>を省略した場合は、S256方式のPKCEが必須です。PKCEに対応していないサービスに限り、クライアントごとに<code>require_pkce = false</code>を指定できます。公開クライアントには対応していません。</p></div>
       </section>
 
       <section class="services-section wrap section-space" id="services" aria-labelledby="services-title">
         <div class="section-heading"><p class="eyebrow">DIRECT OIDC CONNECTIONS</p><h2 id="services-title">使うサービスへ、<br class="mobile-break">Kituneから。</h2></div>
-        <p class="services-lede">サービスごとに別のクライアントIDとsecretを登録します。基本scopeは<code>openid profile email</code>、認証方式は<code>client_secret_basic</code>が既定です。必要に応じて<code>client_secret_post</code>も選べます。実サービスへの接続確認は利用環境で行い、ここでは設定例と互換性の範囲を示します。</p>
+        <p class="services-lede">サービスごとに別のクライアントIDとシークレットを登録します。基本スコープは<code>openid profile email</code>、認証方式は<code>client_secret_basic</code>が既定です。必要に応じて<code>client_secret_post</code>も選べます。実サービスへの接続確認は利用環境で行い、ここでは設定例と互換性の範囲を示します。</p>
         <div class="service-grid">
           <article class="service-card">
             <div class="service-top"><span class="service-number">01</span><span class="service-version">TAILSCALE</span></div>
@@ -106,7 +106,7 @@ require_pkce = false</code></pre>
             <dl class="service-facts">
               <div><dt>callback</dt><dd><code>https://login.tailscale.com/a/oauth_response</code></dd></div>
               <div><dt>issuer</dt><dd><code>https://id.example.com/api/auth</code>（WebFingerとDiscoveryで一致）</dd></div>
-              <div><dt>境界</dt><dd>実サービスへの接続とPKCE送信の挙動は未確認</dd></div>
+              <div><dt>確認状況</dt><dd>実サービスへの接続とPKCE送信の挙動は未確認</dd></div>
             </dl>
           </article>
           <article class="service-card">
@@ -118,7 +118,7 @@ name = "Headscale"
 redirect_uris = ["https://headscale.example.com/oidc/callback"]
 secret_env = "HEADSCALE_CLIENT_SECRET"
 scopes = ["openid", "profile", "email"]
-# 省略時はS256 PKCE必須</code></pre>
+# require_pkceを省略した場合はS256方式のPKCEが必須</code></pre>
             <dl class="service-facts">
               <div><dt>callback</dt><dd><code>https://headscale.example.com/oidc/callback</code></dd></div>
               <div><dt>Headscale側</dt><dd><code>pkce.enabled: true</code> / <code>method: S256</code></dd></div>
@@ -141,7 +141,7 @@ require_pkce = false</code></pre>
             </dl>
           </article>
         </div>
-        <p class="services-note">直接接続時の<code>sub</code>はKituneで設定した固定ユーザーID、<code>groups</code>は<code>personal</code>など元の値です。共有Dexは複数の認証元をまとめる場合の選択肢として残ります。</p>
+        <p class="services-note">直接接続時の<code>sub</code>はKituneで設定した固定ユーザーIDです。<code>groups</code>には、<code>personal</code>などKituneで設定した値をそのまま返します。複数の認証元をまとめる場合は、共有Dexも利用できます。</p>
       </section>
 
       <section class="start-section" id="start" aria-labelledby="start-title">
@@ -158,13 +158,13 @@ bun install --frozen-lockfile</code></pre></div>
             </li>
             <li>
               <div class="step-heading"><span class="step-number">2</span><h3>自分の設定で、起動する</h3></div>
-              <p class="step-description"><code>config.toml</code>のユーザー・クライアントを編集し、<code>.env</code>に<code>BETTER_AUTH_SECRET</code>と各クライアントの<code>secret_env</code>で指定した32文字以上のsecretを設定します。秘密値は<code>openssl rand -hex 32</code>などで個別に生成してください。PKCEは省略時にS256必須、非対応サービスだけ<code>require_pkce = false</code>を指定します。</p>
+              <p class="step-description"><code>config.toml</code>のユーザー・クライアントを編集します。<code>.env</code>の<code>BETTER_AUTH_SECRET</code>と、各クライアントの<code>secret_env</code>で指定した環境変数に、それぞれ32文字以上のシークレットを設定します。シークレットは<code>openssl rand -hex 32</code>などで個別に生成してください。<code>require_pkce</code>を省略した場合は、S256方式のPKCEが必須です。PKCEに対応していないサービスに限り、<code>require_pkce = false</code>を指定します。</p>
               <div class="code-block"><div class="code-toolbar"><span>TERMINAL</span><button type="button" class="copy-button" data-copy="start-code" aria-label="起動コマンドをコピー" hidden>コピー <span aria-hidden="true">⧉</span></button></div><pre tabindex="0" aria-label="起動コマンド"><code id="start-code">bun run cli check-config
 bun run dev</code></pre></div>
             </li>
             <li>
               <div class="step-heading"><span class="step-number">3</span><h3>最初のPasskeyを登録する</h3></div>
-              <p class="step-description">別のターミナルで実行し、表示されたURLをブラウザで開きます。<code>owner</code>は設定したユーザーIDに置き換えてください。登録URLは15分間、一度だけ有効です。</p>
+              <p class="step-description">別のターミナルで実行し、表示されたURLをブラウザで開きます。<code>owner</code>は設定したユーザーIDに置き換えてください。登録URLは発行から15分間有効です。登録が完了すると再利用できなくなります。</p>
               <div class="code-block"><div class="code-toolbar"><span>ANOTHER TERMINAL</span><button type="button" class="copy-button" data-copy="enroll-code" aria-label="Passkey登録コマンドをコピー" hidden>コピー <span aria-hidden="true">⧉</span></button></div><pre tabindex="0" aria-label="Passkey登録コマンド"><code id="enroll-code">bun run cli enroll owner</code></pre></div>
             </li>
           </ol>

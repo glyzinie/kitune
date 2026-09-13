@@ -18,7 +18,7 @@ connectors:
         modifyGroupNames:
           prefix: "owner:"
 
-# KituneにはclientID family-dex、上記callback、同じsecret、S256 PKCE必須で登録します。
-# 他の家族も各人のKituneまたは認証元を、別の固定connector idとsecretで直接追加します。
+# Kituneには、クライアントIDをfamily-dex、callbackを上記URL、シークレットを同じ値にして、S256方式のPKCEが必須のクライアントとして登録します。
+# 他の家族も各人のKituneまたは認証元を、別の固定connector idとシークレットで直接追加します。
 # owner:personal等のグループは、この接続元の自己申告属性です。
 # 家族サービスの利用許可・権限は接続元を踏まえ、サービス側のポリシーで判定します。

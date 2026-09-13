@@ -1,6 +1,6 @@
 # Kituneとサービスの認証構成
 
-secretを保持できるWebサービスは各人のKituneへ直接OIDC接続します。個人Dexは常用しません。家族・サークルで複数の認証元を1つにまとめる必要がある場合だけ、共有Dexを任意で配置します。
+シークレットを保持できるWebサービスは各人のKituneへ直接OIDC接続します。個人Dexは常用しません。家族・サークルで複数の認証元を1つにまとめる必要がある場合だけ、共有Dexを任意で配置します。
 
 | 役割 | ドメイン例 |
 | --- | --- |
@@ -9,7 +9,7 @@ secretを保持できるWebサービスは各人のKituneへ直接OIDC接続し�
 | 家族用の共有Dex | `auth.example.jp` |
 | サークル用の共有Dex | `auth.example.net` |
 
-矢印は認証結果が渡る方向です。直接接続するサービスごとに、独立したクライアントIDとsecretを発行します。
+矢印は認証結果が渡る方向です。直接接続するサービスごとに、独立したクライアントIDとシークレットを発行します。
 
 ```mermaid
 flowchart LR
@@ -22,15 +22,15 @@ flowchart LR
   C --> CS["example.net のサービス"]
 ```
 
-KituneはPasskey・Discordと固定ユーザーIDの対応、プロフィール、ローカルグループ、失効を管理します。共有Dexは参加者の認証元の選択と、共有サービスへのOIDC発行を担当します。共有Dexの導入・運用はKitune本体と独立しています。
+KituneはPasskey・Discordと固定ユーザーIDの対応、プロフィール、Kituneでの所属グループ、失効を管理します。共有Dexは参加者の認証元の選択と、共有サービスへのOIDC発行を担当します。共有Dexの導入・運用はKitune本体と独立しています。
 
 ## クライアントの境界
 
-- 登録対象はsecretを安全に保持できる機密Webクライアントだけです。SPA・ネイティブアプリ・公開クライアント・動的クライアント登録には対応しません。
-- `secret_env` と32文字以上のsecretは必須です。token endpointの認証方式は `client_secret_basic`（既定）または `client_secret_post` です。
+- 登録対象はシークレットを安全に保持できる機密Webクライアントだけです。SPA・ネイティブアプリ・公開クライアント・動的クライアント登録には対応しません。
+- `secret_env` と32文字以上のシークレットは必須です。token endpointの認証方式は `client_secret_basic`（既定）または `client_secret_post` です。
 - `require_pkce` は省略時に `true` として扱い、S256 PKCEを必須にします。PKCEを送信できない機密クライアントだけ、個別に `require_pkce = false` を指定します。
 - PKCEを任意にしたクライアントでも、challengeが送られた場合はS256 verifierを検証します。`plain`、verifierの欠落・不一致、コード再利用、別クライアントからのコード交換は拒否します。
-- PKCEなしで `offline_access` を要求する場合は、OIDC要求に `openid` と空でない `nonce` も必要です。更新が不要なサービスは基本scopeを `openid profile email` とし、`offline_access` を要求しません。
+- PKCEなしで `offline_access` を要求する場合は、OIDC要求に `openid` と空でない `nonce` も必要です。更新が不要なサービスは基本スコープを `openid profile email` とし、`offline_access` を要求しません。
 - ユーザー、Discord紐付け、クライアントは設定を唯一の管理元とします。クライアント設定の変更・削除ではそのクライアントのコードとgrantだけを失効させます。
 
 OIDC処理はBetter Auth公式OAuth Providerプラグインへ委ねます。製品ごとの独自claimやプロトコル処理をKituneへ追加せず、Discovery、ID token、UserInfoの標準的な組み合わせで接続します。
@@ -39,8 +39,8 @@ OIDC処理はBetter Auth公式OAuth Providerプラグインへ委ねます。製
 
 Kituneの本番originを `https://id.example.com` とすると、issuerは `https://id.example.com/api/auth`、Discoveryは `https://id.example.com/api/auth/.well-known/openid-configuration` です。
 
-1. サービスごとにKituneの `[[clients]]` を追加し、別のID、secret用環境変数、callbackを設定する。
-2. サービス側にはKituneのissuerまたはDiscovery URL、同じクライアントIDとsecret、scope `openid profile email` を設定する。
+1. サービスごとにKituneの `[[clients]]` を追加し、別のID、シークレット用環境変数、callbackを設定する。
+2. サービス側にはKituneのissuerまたはDiscovery URL、同じクライアントIDとシークレット、スコープ `openid profile email` を設定する。
 3. サービスが対応している場合はS256 PKCEを有効にする。対応していない場合だけ、そのクライアントへ `require_pkce = false` を設定する。
 4. Discovery、認可、コード交換、UserInfo、ログアウト後の再ログインを実際のサービスで確認する。
 
@@ -48,7 +48,7 @@ Kituneの本番originを `https://id.example.com` とすると、issuerは `http
 
 ## 家族・サークル用の共有Dex
 
-[家族用](../examples/family-dex.yaml)と[サークル用](../examples/circle-dex.yaml)の例は、各参加者のKituneを共有Dexへ1段で接続します。Kitune側には共有Dexごとに別の機密クライアントを登録し、Dex connectorでは `offline_access`、S256 PKCE、UserInfo、グループ取得を有効にします。参加者ごとに固定connector ID、別のsecret、別のグループ接頭辞を用意します。
+[家族用](../examples/family-dex.yaml)と[サークル用](../examples/circle-dex.yaml)の例は、各参加者のKituneを共有Dexへ1段で接続します。Kitune側には共有Dexごとに別の機密クライアントを登録し、Dex connectorでは `offline_access`、S256 PKCE、UserInfo、グループ取得を有効にします。参加者ごとに固定connector ID、別のシークレット、別のグループ接頭辞を用意します。
 
 `insecureEnableGroups` はOIDC connectorによるグループ取得を有効にするDexの設定名です。署名検証やTLS検証を省略する設定ではありません。未検証のメールは `email_verified=false` のまま扱います。Dex同士は循環接続しません。
 

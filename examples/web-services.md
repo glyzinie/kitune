@@ -1,6 +1,6 @@
 # WebサービスのOIDC接続例
 
-3サービスには独立したクライアントIDとsecretを発行します。secretはそれぞれ32文字以上にし、Kituneでは別の環境変数から読み込みます。基本scopeは `openid profile email`、Kitune側のtoken endpoint認証は `client_secret_basic` を初期設定とします。接続先がPOSTを使う場合は、そのクライアントだけ `client_secret_post` に変更します。
+3サービスには独立したクライアントIDとシークレットを発行します。シークレットはそれぞれ32文字以上にし、Kituneでは別の環境変数から読み込みます。基本スコープは `openid profile email`、Kitune側のtoken endpoint認証は `client_secret_basic` を初期設定とします。接続先がPOSTを使う場合は、そのクライアントだけ `client_secret_post` に変更します。
 
 ここに示すのは設定互換性を確認するための例です。Headscale、Gitea、Tailscale自体の導入、既存アカウントの移行、実サービスへの接続結果は含みません。
 
@@ -18,7 +18,7 @@ scopes = ["openid", "profile", "email"]
 skip_consent = false
 ```
 
-Headscale側ではKituneのissuerと同じclient ID・secretを設定し、PKCEを明示的に有効にします。
+Headscale側ではKituneのissuerと、Kituneに登録したクライアントID・シークレットを設定し、PKCEを明示的に有効にします。
 
 ```yaml
 oidc:
@@ -48,7 +48,7 @@ require_pkce = false
 skip_consent = false
 ```
 
-Giteaの管理画面ではOAuth2認証ソースを次の値で追加します。認証ソース名 `kitune` はcallbackのパスに使われるため、変更する場合はKitune側の `redirect_uris` も同じ名前へ変更します。
+Giteaの管理画面ではOAuth2認証ソースを次の値で追加します。認証ソース名 `kitune` はcallbackのパスに使われるため、変更する場合はKitune側の `redirect_uris` も、変更後の認証ソース名を含むURLに変更します。
 
 | 項目 | 値 |
 | --- | --- |
@@ -78,7 +78,7 @@ require_pkce = false
 skip_consent = false
 ```
 
-Tailscaleにはclient ID `tailscale` と、Kituneの `TAILSCALE_CLIENT_SECRET` と同じsecretを設定します。issuer `https://id.example.com/api/auth` は、利用者のメールドメインにあるWebFingerから検出されます。callbackは `https://login.tailscale.com/a/oauth_response` です。
+TailscaleにはクライアントID `tailscale` と、Kituneの `TAILSCALE_CLIENT_SECRET` と同じシークレットを設定します。issuer `https://id.example.com/api/auth` は、利用者のメールドメインにあるWebFingerから検出されます。callbackは `https://login.tailscale.com/a/oauth_response` です。
 
 実際の設定画面にある「Select prompt behavior (optional)」は **Default** を選びます。画面の説明では、認可サーバーがセッションと過去の同意に応じて判断する標準ログイン向けの選択です。`Silent` は有効なセッションや既存同意がないと失敗し、`Prompted` で `consent` を選ぶと権限の再承認を要求します。この画面選択を使ったKituneへの実ログインは未確認です。
 

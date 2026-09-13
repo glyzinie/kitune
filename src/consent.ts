@@ -1,9 +1,9 @@
 const scopeLabels = {
   openid: "あなたを識別するID",
   profile: "名前・ユーザー名",
-  email: "メールアドレス・確認状態",
-  groups: "ローカルグループ",
-  offline_access: "ログイン状態の更新",
+  email: "メールアドレス（確認済みかどうかを含む）",
+  groups: "Kituneでの所属グループ",
+  offline_access: "再ログインせずにアクセスを継続する権限",
 } as const;
 
 // Better Auth 1.7.4 can resolve these OIDC Standard Claims individually at
@@ -15,7 +15,7 @@ const userInfoClaimLabels = {
   given_name: { label: "名", scope: "profile" },
   family_name: { label: "姓", scope: "profile" },
   email: { label: "メールアドレス", scope: "email" },
-  email_verified: { label: "メールアドレスの確認状態", scope: "email" },
+  email_verified: { label: "メールアドレスが確認済みかどうか", scope: "email" },
 } as const;
 
 export interface ConsentDetails {

@@ -8,7 +8,7 @@
 
 1. Fly Appを作り、`kitune_data` Volumeを `nrt` に1GBで作成する。
 2. TLS証明書とDNSを設定する。Discordのcallback URLも本番originに合わせる。
-3. `BETTER_AUTH_SECRET`、必要なDiscord秘密値、クライアントsecretをFly Secretsに設定する。`IDP_CONFIG` には `config.toml` 全体をbase64にした値を設定する。`[[files]]` がデコードして `/app/config.toml` に配置する。秘密値の受け渡しには `fly secrets import` の標準入力を利用し、シェル履歴やログへ出さない。
+3. `BETTER_AUTH_SECRET`、必要なDiscord秘密値、クライアントシークレットをFly Secretsに設定する。`IDP_CONFIG` には `config.toml` 全体をbase64にした値を設定する。`[[files]]` がデコードして `/app/config.toml` に配置する。秘密値の受け渡しには `fly secrets import` の標準入力を利用し、シェル履歴やログへ出さない。
 4. `fly config validate` で設定を確認してから、`fly deploy --ha=false --strategy immediate` で1 Machineへ配置する。必要に応じ `fly scale count 1` で台数を確認する。
 5. `/healthz` とDiscoveryを確認し、実機のPasskey登録・Discord・Webサービスからの直接OIDCログインを検証する。
 
@@ -56,12 +56,12 @@ SQLiteの `VACUUM INTO` を使うため、稼働中のWALを含めた一貫し�
 個人Dexを廃止するときは、Kituneの更新とDexの削除を分けます。WebFingerの公開応答がKituneを指すまでDexを残し、失敗時に旧経路を利用できる状態を維持します。実際のApp名、メールドメイン、秘密値は追跡対象の文書へ記録しません。
 
 1. 稼働中Dexの設定と `staticClients`、App、Machine、Volume、証明書、DNSを実環境から再確認する。想定外の接続先が1つでもあれば削除工程を止め、先に移行対象と所有者を確定する。
-2. KituneとDexの復元可能なSQLiteバックアップを取得する。DBをMachine外へ取り出して暗号化保管し、DBの読取り、対応する設定、issuer、署名鍵の復号に必要な `BETTER_AUTH_SECRET`、クライアントsecretが揃っていることを確認する。
+2. KituneとDexの復元可能なSQLiteバックアップを取得する。DBをMachine外へ取り出して暗号化保管し、DBを読み取れることを確認する。対応する設定、issuer、署名鍵の復号に必要な `BETTER_AUTH_SECRET`、クライアントシークレットが揃っていることも確認する。
 3. 個人Dexクライアントを残したまま更新版Kituneを配置する。一時的な機密クライアントで直接認可、コード交換、UserInfo、必要な更新、失効、stop／suspendからの復帰を確認し、origin、PasskeyのRP ID、固定ユーザーID、署名鍵が維持されていることを確認する。
 4. メールドメインの管理者が、Kituneの配置とは別にWebFingerのissuer参照をDexからKituneの `{origin}/api/auth` へ変更・公開する。外部ネットワークから取得したWebFingerのhrefとKitune Discoveryの `issuer` がパスまで完全に一致するまで、次の削除工程へ進まない。
-5. Kituneの設定から個人Dexクライアントを削除して再配置する。削除したクライアントの未使用コードとgrantだけが失効し、通常ログインとほかのクライアントが継続することを確認する。不要になった上流secretと一時検証用の設定・secretを削除する。
+5. Kituneの設定から個人Dexクライアントを削除して再配置する。削除したクライアントの未使用コードとgrantだけが失効し、通常ログインとほかのクライアントが継続することを確認する。不要になった上流シークレットと一時検証用の設定・シークレットを削除する。
 6. Dex専用のDNSレコードを削除してから、個人Dexの証明書、App、Machine、Volume、専用リソースを削除する。Kitune、メール配信、同じドメインのほかのDNSレコードや共有リソースは変更しない。
-7. Kituneの正常応答、WebFinger、DiscoveryとJWKS、通常ログインを再確認し、Dex専用リソースとsecretが残っていないことを確認する。過去の検証記録と暗号化バックアップは保持する。
+7. Kituneの正常応答、WebFinger、DiscoveryとJWKS、通常ログインを再確認し、Dex専用リソースとシークレットが残っていないことを確認する。過去の検証記録と暗号化バックアップは保持する。
 
 WebFingerが未反映の場合や、認可・復帰・失効の検証に失敗した場合は、個人DexとそのDNS・Volumeを削除せずに工程を保留します。切替後の直接接続ではKituneの固定 `sub` を使い、個人Dex経由の既存アカウントをメール一致で自動移行しません。
 
@@ -74,6 +74,6 @@ fly ssh console -c deploy/local/dex/fly.toml -u dex -C 'sqlite3 /data/dex.sqlite
 fly ssh sftp get -c deploy/local/dex/fly.toml /data/backups/dex-YYYYMMDD.sqlite backups/dex-YYYYMMDD.sqlite
 ```
 
-保存先には毎回新しい名前を使います。暗号化後のコピーからSQLiteを開いて整合性を確認してから、Volume削除を実行します。バックアップに含まれるrefresh token、認可コード、認可要求、offline sessionは復元後の利用再開前に失効させます。
+保存先には毎回新しい名前を使います。暗号化後のコピーからSQLiteを開いて整合性を確認してから、Volume削除を実行します。バックアップに含まれるリフレッシュトークン、認可コード、認可要求、offline sessionは復元後の利用再開前に失効させます。
 
 公式仕様: [Fly設定](https://fly.io/docs/reference/configuration/)、[Volumes](https://fly.io/docs/volumes/overview/)、[自動停止](https://fly.io/docs/launch/autostop-autostart/)、[Dex OIDC connector](https://dexidp.io/docs/connectors/oidc/)。

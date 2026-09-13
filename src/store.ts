@@ -41,7 +41,7 @@ export class Store {
 
   active(id: string) {
     const user = this.user(id);
-    if (!user?.enabled) throw new APIError("FORBIDDEN", { message: "このユーザーは利用できません。", code: "USER_DISABLED" });
+    if (!user?.enabled) throw new APIError("FORBIDDEN", { message: "このアカウントは利用できません。", code: "USER_DISABLED" });
     return user;
   }
 

@@ -1,6 +1,6 @@
 # KituneのFly配置
 
-KituneをFlyへ1 Appで配置し、secretを保持できるWebサービスから直接接続します。Kituneのissuerは `{origin}/api/auth` です。既存環境を更新するときはorigin、PasskeyのRP ID、固定ユーザーID、Volume、`BETTER_AUTH_SECRET` を維持します。
+KituneをFlyへ1 Appで配置し、シークレットを保持できるWebサービスから直接接続します。Kituneのissuerは `{origin}/api/auth` です。既存環境を更新するときはorigin、PasskeyのRP ID、固定ユーザーID、Volume、`BETTER_AUTH_SECRET` を維持します。
 
 初期構成はnrt、shared CPU 1基、256MB、swapなし、Volume 1GB、1 Machineです。未使用時はsuspendし、HTTP要求で復帰します。複数の認証元をまとめる家族・サークル用Dexは任意の別サービスであり、このリポジトリに常用配置の雛形は置きません。
 
@@ -16,13 +16,13 @@ cp config.example.toml deploy/local/kitune/config.toml
 chmod 600 deploy/local/kitune/*
 ```
 
-コピーしたファイルのapp名、origin、ユーザー、OIDCクライアントを編集します。Kituneの `[build].dockerfile` は、移動先の設定ファイルから見た `../../../Dockerfile` に変更します。サービスごとに別のclient ID、callback、secret用環境変数を使います。[Webサービスの接続例](../examples/web-services.md)を参照してください。
+コピーしたファイルのapp名、origin、ユーザー、OIDCクライアントを編集します。Kituneの `[build].dockerfile` は、移動先の設定ファイルから見た `../../../Dockerfile` に変更します。サービスごとに別のクライアントID、callback、シークレット用環境変数を使います。[Webサービスの接続例](../examples/web-services.md)を参照してください。
 
-`require_pkce` は省略時にS256必須です。接続先がPKCEを送信できないことを確認した機密Webクライアントだけ、`require_pkce = false` を設定します。`secret_env` と32文字以上のsecretは例外なく必須で、公開クライアントは登録できません。
+`require_pkce` を省略した場合は、S256方式のPKCEが必須です。接続先がPKCEを送信できないことを確認した機密Webクライアントだけ、`require_pkce = false` を設定します。`secret_env` と32文字以上のシークレットは例外なく必須で、公開クライアントは登録できません。
 
 ## 設定の反映
 
-`BETTER_AUTH_SECRET`、必要なDiscord秘密値、各OIDCクライアントのsecretをFly Secretsへ個別に保存します。設定全体はbase64にして `IDP_CONFIG` に保存します。以下はリポジトリルートで実行します。
+`BETTER_AUTH_SECRET`、必要なDiscord秘密値、各OIDCクライアントのシークレットをFly Secretsへ個別に保存します。設定全体はbase64にして `IDP_CONFIG` に保存します。以下はリポジトリルートで実行します。
 
 ```sh
 CONFIG_PATH=deploy/local/kitune/config.toml bun run cli check-config
@@ -31,11 +31,11 @@ fly config validate -c deploy/local/kitune/fly.toml
 fly deploy . -c deploy/local/kitune/fly.toml --remote-only --ha=false --strategy immediate
 ```
 
-`fly secrets import` へ標準入力で渡し、設定やsecretをシェル履歴・ログへ展開しません。配置後は次を確認します。
+`fly secrets import` へ標準入力で渡し、設定やシークレットをシェル履歴・ログへ展開しません。配置後は次を確認します。
 
 1. `/healthz`、`/api/auth/.well-known/openid-configuration`、Discoveryが示すJWKSが正常に取得できる。
 2. Discoveryのissuerが設定した `{origin}/api/auth` と完全に一致する。
-3. 実機Passkeyでログインでき、直接接続した一時クライアントで認可、コード交換、UserInfo、必要ならrefresh token更新が成功する。
+3. 実機Passkeyでログインでき、直接接続した一時クライアントで認可、コード交換、UserInfo、必要ならリフレッシュトークン更新が成功する。
 4. 再起動の前後でユーザーの `sub` と署名鍵が維持される。
 5. クライアント設定を変えたとき、そのクライアントのコードとgrantだけが失効し、ほかのログインとクライアントは継続する。
 

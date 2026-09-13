@@ -18,6 +18,6 @@ connectors:
         modifyGroupNames:
           prefix: "owner:"
 
-# KituneにはclientID circle-dex、上記callback、同じsecret、S256 PKCE必須で登録します。
-# 他のメンバーも各人のKituneまたは認証元を、別の固定connector idとsecretで直接追加します。
+# Kituneには、クライアントIDをcircle-dex、callbackを上記URL、シークレットを同じ値にして、S256方式のPKCEが必須のクライアントとして登録します。
+# 他のメンバーも各人のKituneまたは認証元を、別の固定connector idとシークレットで直接追加します。
 # owner:personal等のグループを、サークルの管理者権限として無条件に扱わないでください。
